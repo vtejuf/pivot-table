@@ -8,9 +8,14 @@
 布局层不做任何 sum / avg / count，聚合层也不关心行列和矩阵；渲染层只消费
 布局结果，不做聚合。
 
+GitHub Pages 主页（部署后）：`https://vtejuf.github.io/pivot-table/`。
+主页包含算法说明、可交互 Demo 和性能方案，左侧菜单、右侧内容。
+
 ## 目录结构
 
 ```
+index.html            GitHub Pages 主页（左侧菜单 + 算法 + Demo）
+.nojekyll             跳过 Jekyll，按静态文件原样发布
 src/
   model/
     index.mjs          模型入口：aggregate / layoutPivot
@@ -22,12 +27,16 @@ src/
     geometry.mjs       纯几何：视口、屏幕矩形、冻结表头
     canvas-renderer.mjs Canvas 2D 绘制
     theme.mjs          默认主题与颜色工具
+site/
+  main.mjs             主页导航与 Demo 初始化
+  demo.mjs             主页 / 示例共用的 Demo 控制器
+  styles.css           主页样式
 test/
   model/               聚合与布局测试
   render/              几何、绘制、主题测试
 examples/
   demo.mjs             终端输出布局结果
-  canvas.html          浏览器可视化示例
+  canvas.html          独立 Canvas 示例（复用 site/demo.mjs）
   sample-data.mjs      示例数据（浏览器与 Node 共享）
 docs/
   matrix-transform.md  矩阵推导与 cartesian/compact 差异
@@ -37,15 +46,17 @@ docs/
 ## 快速开始
 
 ```bash
+# Node：模型示例与测试
 node examples/demo.mjs
 node --test test/model/*.test.mjs test/render/*.test.mjs
 ```
 
-浏览器示例需要通过 HTTP 打开（ES module 不能走 `file://`）：
+主页和浏览器示例需要通过 HTTP 打开（ES module 不能走 `file://`）：
 
 ```bash
 python3 -m http.server 8000
-# 打开 http://localhost:8000/examples/canvas.html
+# 主页：http://localhost:8000/
+# 独立示例：http://localhost:8000/examples/canvas.html
 ```
 
 ## 数据模型
@@ -175,6 +186,27 @@ const { geometry, stats } = renderPivot(canvas, result, {
 坐标换算与渲染解耦：`computePivotGeometry()` 只做纯几何计算，可单独用于
 SVG、DOM 或自定义渲染器。完整的管线说明、性能机制和 Canvas / SVG / DOM /
 WebGL 的取舍见 [docs/rendering.md](docs/rendering.md)。
+
+## 主页与 GitHub Pages
+
+根目录的 `index.html` 是纯静态主页，不需要构建：
+
+- 左侧菜单：概览、数据流、矩阵算法、Demo、性能方案、快速开始；
+- 右侧内容包含算法推导、可交互 Canvas Demo 和方案对比；
+- Demo 控制器在 `site/demo.mjs`，主页与 `examples/canvas.html` 共用；
+- 控件通过 `data-demo-*` 属性接入，页面上预留了“小计 / 总计”“折叠 / 展开”
+  扩展位。后续可在 `rebuildLayout()` 前处理聚合行，或扩展布局的可见成员集合。
+
+部署到 GitHub Pages：
+
+1. 将主页改动合并到要发布的分支（通常是 `main`）。
+2. 打开仓库 **Settings → Pages → Build and deployment**。
+3. Source 选择 **Deploy from a branch**，分支选择 `main`，目录选择 `/ (root)`。
+4. 保存后访问 `https://<user>.github.io/pivot-table/`，本项目为
+   `https://vtejuf.github.io/pivot-table/`。
+
+`.nojekyll` 让 Pages 跳过 Jekyll，直接按静态文件发布 `src/`、`site/` 等目录。
+如果主页改动还在 `dev` 分支，需要先合并到发布分支才会更新线上站点。
 
 ## 当前假设
 

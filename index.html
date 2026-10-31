@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pivot-table · 矩阵布局与 Canvas 渲染</title>
+    <meta
+      name="description"
+      content="把 JSON 多维数据聚合成透视表，用矩阵变换映射到二维网格，再由 Canvas 只绘制视口内的单元格。"
+    />
+    <meta name="theme-color" content="#0b1220" />
+    <meta property="og:title" content="pivot-table · 矩阵布局与 Canvas 渲染" />
+    <meta
+      property="og:description"
+      content="聚合、矩阵布局、Canvas 虚拟滚动。零依赖的透视表模型与可视化。"
+    />
+    <meta property="og:type" content="website" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1220'/%3E%3Cpath d='M7 11h18M7 16h18M7 21h18M12 7v18M20 7v18' stroke='%2360a5fa' stroke-width='1.6'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./site/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+
+    <div class="app">
+      <aside class="sidebar">
+        <a class="brand" href="#overview" aria-label="pivot-table 首页">
+          <svg
+            class="brand__icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="3" />
+            <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
+          </svg>
+          <span class="brand__text">
+            <strong>pivot-table</strong>
+            <small>矩阵布局 · Canvas 渲染</small>
+          </span>
+        </a>
+
+        <nav class="site-nav" aria-label="页面导航">
+          <a class="site-nav__link is-active" href="#overview" aria-current="page">
+            <span>01</span>概览
+          </a>
+          <a class="site-nav__link" href="#pipeline"><span>02</span>数据流</a>
+          <a class="site-nav__link" href="#algorithm"><span>03</span>矩阵算法</a>
+          <a class="site-nav__link" href="#demo"><span>04</span>可视化 Demo</a>
+          <a class="site-nav__link" href="#performance"><span>05</span>性能方案</a>
+          <a class="site-nav__link" href="#quickstart"><span>06</span>快速开始</a>
+        </nav>
+
+        <div class="sidebar__footer">
+          <a
+            href="https://github.com/vtejuf/pivot-table"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub 源码 <span aria-hidden="true">↗</span>
+          </a>
+          <span>MIT License</span>
+          <span>零运行时依赖</span>
+        </div>
+      </aside>
+
+      <main id="main" class="content" tabindex="-1">
+        <section id="overview" class="section hero">
+          <div class="hero__glow" aria-hidden="true"></div>
+          <p class="eyebrow">pivot table · model + canvas</p>
+          <h1>
+            把多维数据<br />
+            <span class="gradient-text">折叠成一张二维表</span>
+          </h1>
+          <p class="hero__lead">
+            聚合给出每个维度组合唯一的数据；矩阵变换把维度序号映射成
+            <code>[x, y]</code>；Canvas 只绘制视口内的单元格。模型、布局和渲染彼此独立。
+          </p>
+          <div class="hero__actions">
+            <a class="button button--primary" href="#demo">体验 Demo</a>
+            <a
+              class="button"
+              href="https://github.com/vtejuf/pivot-table"
+              target="_blank"
+              rel="noreferrer"
+            >
+              查看源码
+            </a>
+          </div>
+          <ul class="tags" aria-label="项目特点">
+            <li>零依赖</li>
+            <li>矩阵布局</li>
+            <li>视口虚拟化</li>
+            <li>多层表头</li>
+            <li>ES Modules</li>
+          </ul>
+
+          <dl class="hero__stats">
+            <div>
+              <dt>核心模块</dt>
+              <dd>2</dd>
+            </div>
+            <div>
+              <dt>运行时依赖</dt>
+              <dd>0</dd>
+            </div>
+            <div>
+              <dt>绘制成本</dt>
+              <dd>O(可见格)</dd>
+            </div>
+            <div>
+              <dt>压测网格</dt>
+              <dd>150×150</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section id="pipeline" class="section">
+          <header class="section__head">
+            <p class="eyebrow">02 · pipeline</p>
+            <h2>两个业务，一条数据流</h2>
+            <p>
+              聚合层不读取行列配置，布局层不做 sum / avg / count，渲染层只消费布局结果。
+              每一层都可以单独替换。
+            </p>
+          </header>
+
+          <div class="pipeline">
+            <article class="card pipeline__step">
+              <span class="step__index">01</span>
+              <h3>聚合</h3>
+              <p>按维度 key 分组，每个维度组合只保留一行，并计算 count / sum / avg / min / max。</p>
+              <code>aggregate(rows, { dimensions, measure })</code>
+            </article>
+            <article class="card pipeline__step">
+              <span class="step__index">02</span>
+              <h3>布局</h3>
+              <p>把成员取值编码成序号，通过仿射矩阵得到整数网格坐标，并生成可递归渲染的表头。</p>
+              <code>layoutPivot(cube.rows, { dimensions, value })</code>
+            </article>
+            <article class="card pipeline__step">
+              <span class="step__index">03</span>
+              <h3>渲染</h3>
+              <p>根据滚动位置计算可见范围与屏幕矩形，只绘制视口内的格子、文本和冻结表头。</p>
+              <code>renderPivot(canvas, layout, options)</code>
+            </article>
+          </div>
+
+          <div class="callout">
+            <div class="callout__icon" aria-hidden="true">→</div>
+            <div>
+              <strong>布局输出的是纯数据。</strong>
+              每个单元格带 <code>vector: [x, y]</code>，同时提供 <code>cellMap</code>
+              哈希索引。渲染器、命中测试和导出都复用同一份布局。
+            </div>
+          </div>
+        </section>
+
+        <section id="algorithm" class="section">
+          <header class="section__head">
+            <p class="eyebrow">03 · matrix transform</p>
+            <h2>一次矩阵乘法，定位每个单元格</h2>
+            <p>
+              维度层级等价于混合进制数：父级粗定位，子级在父级划出的块内细定位。
+              整棵树最终折叠成一个固定矩阵。
+            </p>
+          </header>
+
+          <div class="split">
+            <div class="prose">
+              <p>
+                一条记录被编码成增广向量，每个维度贡献一个成员序号
+                <code>i<sub>d</sub></code>，最后补一个常数项 1：
+              </p>
+              <pre class="formula">v = [i₁, i₂, ..., i_D, 1]ᵀ</pre>
+              <p>
+                矩阵 <code>M</code> 的第 d 列是该维度所在轴的单位向量乘以
+                <code>span<sub>d</sub></code>，最后一列是平移：
+              </p>
+              <pre class="formula">[x, y]ᵀ = M · v</pre>
+              <p>
+                父子 span 满足乘积关系。父维度每变一级，跨过的行数正好是
+                子维度成员数乘以子维度 span：
+              </p>
+              <pre class="formula">span_parent = n_child × span_child
+span_d      = Π n_c（c 为 d 的后代）</pre>
+
+              <div class="compare">
+                <article class="compare__item">
+                  <h3>cartesian <span class="badge">默认</span></h3>
+                  <p>
+                    每个父成员下补齐全局子成员，形成规则网格。span 与父成员无关，
+                    整个布局是一个固定矩阵，代价是空单元格。
+                  </p>
+                </article>
+                <article class="compare__item">
+                  <h3>compact <span class="badge badge--alt">紧凑</span></h3>
+                  <p>
+                    只排列数据中实际出现的组合，父成员块大小可变。没有全局固定矩阵，
+                    但每条记录仍给出分段仿射变换。
+                  </p>
+                </article>
+              </div>
+
+              <ul class="checklist">
+                <li>表头成员的 <code>offset / size</code> 直接对应 rowspan / colspan。</li>
+                <li>重复维度组合默认报错，强制先聚合，不在布局层偷偷合并。</li>
+                <li>每个轴支持一条层级链：单根、每个父维度最多一个子维度。</li>
+              </ul>
+            </div>
+
+            <aside class="formula-card">
+              <p class="formula-card__label">region &gt; city &gt; year</p>
+              <pre class="matrix">        [region] [city] [year] [1]
+x  =  [   0       0      1     0 ] · v
+y  =  [   3       1      0     0 ] · v</pre>
+              <dl class="formula-card__notes">
+                <div>
+                  <dt>region span</dt>
+                  <dd>3 = n_city × 1</dd>
+                </div>
+                <div>
+                  <dt>city span</dt>
+                  <dd>1</dd>
+                </div>
+                <div>
+                  <dt>year span</dt>
+                  <dd>1 · 列轴</dd>
+                </div>
+              </dl>
+              <p class="formula-card__hint">
+                city 有 3 个成员：region 每变一级跨 3 行，city 每变一级跨 1 行。
+              </p>
+            </aside>
+          </div>
+        </section>
+
+        <section id="demo" class="section section--demo">
+          <header class="section__head">
+            <p class="eyebrow">04 · live demo</p>
+            <h2>滚动一张真实数据透视表</h2>
+            <p>
+              5 个区域、20 个城市、6 年、3 类产品，共 867 条明细聚合为 288 行。
+              表头冻结，数据区只绘制视口内的部分。
+            </p>
+          </header>
+
+          <div class="demo-card">
+            <div class="demo-toolbar">
+              <label class="field">
+                <span>布局模式</span>
+                <select data-demo-mode>
+                  <option value="compact" selected>compact · 紧凑块</option>
+                  <option value="cartesian">cartesian · 规则网格</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>度量</span>
+                <select data-demo-measure>
+                  <option value="sales" selected>销售额 sum</option>
+                  <option value="count">订单数 count</option>
+                </select>
+              </label>
+
+              <label class="check">
+                <input type="checkbox" data-demo-heatmap checked />
+                <span>数值色阶</span>
+              </label>
+
+              <label class="field field--range">
+                <span>列宽</span>
+                <input
+                  type="range"
+                  data-demo-width
+                  min="56"
+                  max="168"
+                  step="4"
+                  value="104"
+                />
+                <output data-demo-zoom>104px</output>
+              </label>
+
+              <button class="button button--small" type="button" data-demo-reset>
+                回到左上角
+              </button>
+            </div>
+
+            <div class="demo-stage">
+              <canvas
+                data-demo-canvas
+                tabindex="0"
+                aria-label="透视表 Canvas 演示：使用滚轮、拖拽或方向键平移，表头保持冻结"
+              ></canvas>
+            </div>
+
+            <div class="demo-status">
+              <span data-demo-grid-size>加载中…</span>
+              <span data-demo-stats></span>
+              <span data-demo-matrix></span>
+            </div>
+
+            <div class="demo-extensions" aria-label="规划中的 Demo 功能">
+              <span class="demo-extensions__label">Demo 扩展位</span>
+              <button type="button" disabled>小计 / 总计</button>
+              <button type="button" disabled>折叠 / 展开</button>
+              <span class="demo-extensions__hint">后续接入模型层</span>
+            </div>
+
+            <p class="demo-error" data-demo-error role="alert" hidden></p>
+          </div>
+
+          <p class="demo-hint">
+            滚轮或拖拽平移，<kbd>Shift</kbd> + 滚轮横向滚动；聚焦画布后可用方向键、
+            <kbd>PageUp</kbd> / <kbd>PageDown</kbd>、<kbd>Home</kbd> / <kbd>End</kbd>。
+          </p>
+        </section>
+
+        <section id="performance" class="section">
+          <header class="section__head">
+            <p class="eyebrow">05 · performance</p>
+            <h2>成本跟视口走，而不是跟整张表走</h2>
+            <p>
+              滚动时只遍历可见单元格；表头按 offset 二分剪枝；尺寸不变时复用
+              canvas 缓冲区；热力范围按 layout 缓存。
+            </p>
+          </header>
+
+          <div class="metrics">
+            <article class="metric">
+              <strong>22,500</strong>
+              <span>150×150 压测网格的总格数</span>
+            </article>
+            <article class="metric">
+              <strong>50</strong>
+              <span>480×280 数据视口实际绘制格数</span>
+            </article>
+            <article class="metric">
+              <strong>1 次</strong>
+              <span>每个 layout 只扫描一次热力范围</span>
+            </article>
+          </div>
+
+          <div class="split split--top">
+            <div class="prose">
+              <h3>渲染层做了什么</h3>
+              <ul class="checklist">
+                <li>视口虚拟化：只遍历 <code>visible</code> 范围，总格数不参与每帧循环。</li>
+                <li>单元格查找 O(1)：模型输出 <code>cellMap</code>。</li>
+                <li>网格线合并为一次 <code>beginPath()</code> + <code>stroke()</code>。</li>
+                <li>表头 offset 单调，二分跳过视口外成员及其子树。</li>
+                <li>数据区与两块表头分别裁剪，冻结表头不触发整表重绘。</li>
+                <li>DPR 变换只设置一次；尺寸不变不重置 canvas 缓冲区。</li>
+              </ul>
+            </div>
+
+            <div class="card plan-card">
+              <h3>方案取舍</h3>
+              <ul class="plan-list">
+                <li>
+                  <strong>Canvas 2D · 当前</strong>
+                  <span>约 1k–100k 格；零依赖，文本与矩形批量绘制快。</span>
+                </li>
+                <li>
+                  <strong>Canvas + 离屏缓存</strong>
+                  <span>连续滚动的大表；缓存表头、网格和斑马纹位图。</span>
+                </li>
+                <li>
+                  <strong>WebGL / WebGPU</strong>
+                  <span>十万到百万格、平滑缩放；文本排版和命中测试成本更高。</span>
+                </li>
+                <li>
+                  <strong>DOM / SVG</strong>
+                  <span>小表、文本选择、屏幕阅读器；节点多时性能下降明显。</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <a
+            class="text-link"
+            href="https://github.com/vtejuf/pivot-table/blob/main/docs/rendering.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            阅读完整渲染管线与性能方案 <span aria-hidden="true">↗</span>
+          </a>
+        </section>
+
+        <section id="quickstart" class="section">
+          <header class="section__head">
+            <p class="eyebrow">06 · quickstart</p>
+            <h2>直接使用</h2>
+            <p>没有构建步骤，没有运行时依赖。模型和渲染都是原生 ES Modules。</p>
+          </header>
+
+          <div class="split split--top">
+            <div class="code-card">
+              <div class="code-card__bar">
+                <span>app.mjs</span>
+                <span>ES Module</span>
+              </div>
+              <pre><code>import { aggregate, layoutPivot } from './src/model/index.mjs';
+import { renderPivot } from './src/render/index.mjs';
+
+const cube = aggregate(rows, {
+  dimensions,
+  measure: { key: 'sales', aggregate: 'sum' },
+});
+
+const layout = layoutPivot(cube.rows, {
+  dimensions,
+  value: 'sales',
+});
+
+renderPivot(canvas, layout, {
+  viewport: { width: 960, height: 540 },
+  heatmap: true,
+});</code></pre>
+            </div>
+
+            <div class="quickstart__side">
+              <div class="card">
+                <h3>本地运行</h3>
+                <pre class="command">node examples/demo.mjs
+node --test test/model/*.test.mjs test/render/*.test.mjs</pre>
+                <p class="muted">
+                  浏览器示例需要通过 HTTP 打开，ES module 不能走 <code>file://</code>。
+                </p>
+                <pre class="command">python3 -m http.server 8000
+# http://localhost:8000/</pre>
+              </div>
+
+              <div class="card">
+                <h3>继续阅读</h3>
+                <div class="link-list">
+                  <a
+                    href="https://github.com/vtejuf/pivot-table/blob/main/README.md"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    README <span aria-hidden="true">↗</span>
+                  </a>
+                  <a
+                    href="https://github.com/vtejuf/pivot-table/blob/main/docs/matrix-transform.md"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    矩阵推导 <span aria-hidden="true">↗</span>
+                  </a>
+                  <a
+                    href="https://github.com/vtejuf/pivot-table/blob/main/docs/rendering.md"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    渲染与性能 <span aria-hidden="true">↗</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer class="footer">
+          <span>pivot-table · MIT License</span>
+          <a
+            href="https://github.com/vtejuf/pivot-table"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub <span aria-hidden="true">↗</span>
+          </a>
+        </footer>
+      </main>
+    </div>
+
+    <script type="module" src="./site/main.mjs"></script>
+  </body>
+</html>
