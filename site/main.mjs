@@ -1,4 +1,5 @@
 import { createPivotDemo } from './demo.mjs';
+import { renderBenchmark } from './bench.mjs';
 
 /* -------------------------------------------------------------------------- */
 /* 侧栏导航高亮                                                               */
@@ -62,3 +63,5 @@ try {
     target.textContent = `Demo 初始化失败：${error.message}`;
   }
 }
+
+renderBenchmark();

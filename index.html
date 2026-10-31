@@ -52,7 +52,8 @@
           <a class="site-nav__link" href="#algorithm"><span>03</span>矩阵算法</a>
           <a class="site-nav__link" href="#demo"><span>04</span>可视化 Demo</a>
           <a class="site-nav__link" href="#performance"><span>05</span>性能方案</a>
-          <a class="site-nav__link" href="#quickstart"><span>06</span>快速开始</a>
+          <a class="site-nav__link" href="#benchmark"><span>06</span>基准测试</a>
+          <a class="site-nav__link" href="#quickstart"><span>07</span>快速开始</a>
         </nav>
 
         <div class="sidebar__footer">
@@ -391,9 +392,107 @@ y  =  [   3       1      0     0 ] · v</pre>
           </a>
         </section>
 
+        <section id="benchmark" class="section">
+          <header class="section__head">
+            <p class="eyebrow">06 · benchmark</p>
+            <h2>本机实测：一万到一千万条明细</h2>
+            <p>
+              用真实的 aggregate + layoutPivot 跑模型变换，每个规模独立 Node 进程重复 3 次，
+              取总耗时中位数。千万级在本机可用内存不足，改用分片聚合；表格里明确标注两种方式。
+            </p>
+          </header>
+
+          <div class="bench-summary">
+            <article class="metric">
+              <strong data-bench-summary="million">—</strong>
+              <span>100 万条 · 单次变换</span>
+            </article>
+            <article class="metric">
+              <strong data-bench-summary="ten-million">—</strong>
+              <span>1000 万条 · 分片变换</span>
+            </article>
+            <article class="metric">
+              <strong data-bench-summary="peak">—</strong>
+              <span>单次百万级峰值内存</span>
+            </article>
+          </div>
+
+          <div class="bench-card">
+            <div class="bench-table-wrap">
+              <table class="bench-table">
+                <thead>
+                  <tr>
+                    <th scope="col">原始记录</th>
+                    <th scope="col">生成</th>
+                    <th scope="col">聚合</th>
+                    <th scope="col">合并</th>
+                    <th scope="col">布局</th>
+                    <th scope="col">变换</th>
+                    <th scope="col">峰值内存</th>
+                    <th scope="col">方式</th>
+                  </tr>
+                </thead>
+                <tbody data-bench-rows>
+                  <tr>
+                    <td colspan="8">正在加载基准结果…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="bench-meta" data-bench-meta>
+              基准数据来自 bench/results.json；页面需要通过 HTTP 打开。
+            </p>
+          </div>
+
+          <div class="bench-detail">
+            <div>
+              <h3>怎么测的</h3>
+              <ul class="checklist" data-bench-notes>
+                <li>加载中…</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>读数</h3>
+              <ul class="plan-list">
+                <li>
+                  <strong>聚合是主要成本</strong>
+                  <span>明细数每增一个数量级，聚合耗时大致同向增长；单次样本会受 GC 与宿主负载影响。</span>
+                </li>
+                <li>
+                  <strong>布局几乎恒定</strong>
+                  <span>固定 1536 个维度组合后，布局耗时基本不变，与原始明细数无关。</span>
+                </li>
+                <li>
+                  <strong>千万级靠分片控制内存</strong>
+                  <span>单次百万级已需要约 250 MB；分片千万级把峰值控制在两百 MB 以内。</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <p class="bench-source">
+            结果文件：
+            <a
+              href="https://github.com/vtejuf/pivot-table/blob/main/bench/results.json"
+              target="_blank"
+              rel="noreferrer"
+            >
+              bench/results.json
+            </a>
+            · 复现：<code>node bench/run.mjs</code> · 脚本：
+            <a
+              href="https://github.com/vtejuf/pivot-table/blob/main/bench/transform.mjs"
+              target="_blank"
+              rel="noreferrer"
+            >
+              bench/transform.mjs
+            </a>
+          </p>
+        </section>
+
         <section id="quickstart" class="section">
           <header class="section__head">
-            <p class="eyebrow">06 · quickstart</p>
+            <p class="eyebrow">07 · quickstart</p>
             <h2>直接使用</h2>
             <p>没有构建步骤，没有运行时依赖。模型和渲染都是原生 ES Modules。</p>
           </header>

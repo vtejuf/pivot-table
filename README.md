@@ -38,6 +38,13 @@ examples/
   demo.mjs             终端输出布局结果
   canvas.html          独立 Canvas 示例（复用 site/demo.mjs）
   sample-data.mjs      示例数据（浏览器与 Node 共享）
+bench/
+  config.mjs           基准维度配置（8 × 8 × 6 × 4 = 1536 组合）
+  generate.mjs         确定性数据生成与分片合并
+  transform.mjs        单个规模的变换基准
+  run.mjs              多规模运行器（独立进程、3 次中位数）
+  verify.mjs           校验分片聚合与单次结果一致
+  results.json         最新实测结果（主页基准表格读取）
 docs/
   matrix-transform.md  矩阵推导与 cartesian/compact 差异
   rendering.md         Canvas 渲染管线与性能方案
@@ -49,6 +56,10 @@ docs/
 # Node：模型示例与测试
 node examples/demo.mjs
 node --test test/model/*.test.mjs test/render/*.test.mjs
+
+# 基准测试（写 bench/results.json）
+node bench/run.mjs
+node bench/verify.mjs
 ```
 
 主页和浏览器示例需要通过 HTTP 打开（ES module 不能走 `file://`）：
@@ -186,6 +197,40 @@ const { geometry, stats } = renderPivot(canvas, result, {
 坐标换算与渲染解耦：`computePivotGeometry()` 只做纯几何计算，可单独用于
 SVG、DOM 或自定义渲染器。完整的管线说明、性能机制和 Canvas / SVG / DOM /
 WebGL 的取舍见 [docs/rendering.md](docs/rendering.md)。
+
+## 基准测试
+
+本地实测原始明细经过 `aggregate()` + `layoutPivot()` 的耗时与峰值内存：
+
+- 维度固定：8 region × 8 city × 6 year × 4 product = 1536 个组合。
+- 1 万 / 10 万 / 100 万：单次 `aggregate()`，完整数组驻留内存。
+- 1000 万：按百万级峰值线性外推，单次聚合预计需要约 2 GB 以上，超过本机
+  可用内存，改用每片 20 万条的分片聚合；分片合并逻辑由 `bench/verify.mjs`
+  校验与单次结果一致。
+- 每个规模独立 Node 进程，重复 3 次取**变换耗时中位数**；峰值内存为
+  `process.resourceUsage().maxRSS`。变换耗时 = 聚合 + 合并 + 布局，不含夹具生成。
+
+本次环境：Node v24.22.2，2 vCPU Intel Xeon Gold 6271C，1.8 GiB 内存
+（运行前可用约 0.9 GiB），Linux x64。
+
+结果（变换耗时 / 峰值内存）：
+
+- 1 万：38.2 ms / 62.9 MB
+- 10 万：104.8 ms / 82.0 MB
+- 100 万：848.6 ms / 249.2 MB
+- 1000 万（分片）：8.00 s / 184.1 MB
+
+聚合是主要成本，百万级约 827 ms；布局固定 1536 个组合，耗时约 13–22 ms，
+基本不随原始明细数增长。1000 万级单次聚合按百万级内存线性外推会超过 2 GB，
+本机未运行。
+
+完整数据与每次样本见 `bench/results.json`，主页的“基准测试”区会读取并展示。
+复现：
+
+```bash
+node bench/run.mjs
+node bench/verify.mjs
+```
 
 ## 主页与 GitHub Pages
 

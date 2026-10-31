@@ -1,0 +1,410 @@
+{
+  "generatedAt": "2026-10-31T08:19:19.833Z",
+  "environment": {
+    "node": "v24.22.2",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz",
+    "cpuCount": 2,
+    "totalMemoryGB": 1.8,
+    "availableMemoryGBAtStart": 0.9,
+    "cgroupMemoryGB": null
+  },
+  "config": {
+    "dimensions": [
+      "region × 8",
+      "city × 8",
+      "year × 6",
+      "product × 4"
+    ],
+    "combinations": 1536,
+    "measure": "sales · sum",
+    "rows": "5 个字段：region / city / year / product / sales",
+    "layout": "cartesian"
+  },
+  "notes": [
+    "每个规模在独立 Node 进程中运行，重复 3 次，取变换耗时中位数的一次作为代表；原始样本保存在 results.json。",
+    "变换耗时 = 聚合 + 合并 + 布局，不包含夹具生成；耗时用 performance.now()，内存用 process.memoryUsage() 与 process.resourceUsage().maxRSS。",
+    "1,000 万级使用分片聚合（每片 200,000 条），避免一次性持有全部明细；1 万–100 万级是单次 aggregate()。",
+    "分片合并逻辑用 bench/verify.mjs 与单次聚合逐组比对，sales / __count / __valueCount 一致。",
+    "布局耗时与聚合后的维度组合数相关，这里固定为 1536 个组合，因此不随原始明细数增长。"
+  ],
+  "results": [
+    {
+      "ok": true,
+      "rows": 10000,
+      "mode": "single",
+      "chunkSize": null,
+      "stages": {
+        "generateMs": 2.62,
+        "aggregateMs": 24.46,
+        "mergeMs": null,
+        "layoutMs": 13.72,
+        "transformMs": 38.18,
+        "totalMs": 40.8
+      },
+      "memory": {
+        "baselineHeapMB": 3.9,
+        "generateHeapMB": 4.7,
+        "aggregateHeapMB": 4.8,
+        "layoutHeapMB": 6.6,
+        "baselineRssMB": 47.3,
+        "maxRssMB": 62.9
+      },
+      "output": {
+        "cubeRows": 1536,
+        "gridRows": 64,
+        "gridCols": 24,
+        "cells": 1536
+      },
+      "runtime": {
+        "node": "v24.22.2",
+        "platform": "linux",
+        "arch": "x64"
+      },
+      "wallMs": 130.09,
+      "repeats": 3,
+      "samples": [
+        {
+          "stages": {
+            "generateMs": 2.72,
+            "aggregateMs": 20.64,
+            "mergeMs": null,
+            "layoutMs": 13.44,
+            "transformMs": 34.07,
+            "totalMs": 36.79
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": 4.7,
+            "aggregateHeapMB": 4.8,
+            "layoutHeapMB": 6.6,
+            "baselineRssMB": 47.3,
+            "maxRssMB": 63
+          },
+          "wallMs": 123.1
+        },
+        {
+          "stages": {
+            "generateMs": 2.62,
+            "aggregateMs": 24.46,
+            "mergeMs": null,
+            "layoutMs": 13.72,
+            "transformMs": 38.18,
+            "totalMs": 40.8
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": 4.7,
+            "aggregateHeapMB": 4.8,
+            "layoutHeapMB": 6.6,
+            "baselineRssMB": 47.3,
+            "maxRssMB": 62.9
+          },
+          "wallMs": 130.09
+        },
+        {
+          "stages": {
+            "generateMs": 2.62,
+            "aggregateMs": 25.82,
+            "mergeMs": null,
+            "layoutMs": 13.59,
+            "transformMs": 39.41,
+            "totalMs": 42.03
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": 4.7,
+            "aggregateHeapMB": 4.8,
+            "layoutHeapMB": 6.6,
+            "baselineRssMB": 47.2,
+            "maxRssMB": 63.2
+          },
+          "wallMs": 131.64
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "rows": 100000,
+      "mode": "single",
+      "chunkSize": null,
+      "stages": {
+        "generateMs": 22.67,
+        "aggregateMs": 91.64,
+        "mergeMs": null,
+        "layoutMs": 13.12,
+        "transformMs": 104.76,
+        "totalMs": 127.44
+      },
+      "memory": {
+        "baselineHeapMB": 3.9,
+        "generateHeapMB": 10.8,
+        "aggregateHeapMB": 11,
+        "layoutHeapMB": 12.8,
+        "baselineRssMB": 47.3,
+        "maxRssMB": 82
+      },
+      "output": {
+        "cubeRows": 1536,
+        "gridRows": 64,
+        "gridCols": 24,
+        "cells": 1536
+      },
+      "runtime": {
+        "node": "v24.22.2",
+        "platform": "linux",
+        "arch": "x64"
+      },
+      "wallMs": 240.79,
+      "repeats": 3,
+      "samples": [
+        {
+          "stages": {
+            "generateMs": 26.03,
+            "aggregateMs": 93.34,
+            "mergeMs": null,
+            "layoutMs": 11.22,
+            "transformMs": 104.55,
+            "totalMs": 130.58
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": 10.8,
+            "aggregateHeapMB": 11,
+            "layoutHeapMB": 12.8,
+            "baselineRssMB": 47.2,
+            "maxRssMB": 81.8
+          },
+          "wallMs": 244.97
+        },
+        {
+          "stages": {
+            "generateMs": 22.06,
+            "aggregateMs": 92.52,
+            "mergeMs": null,
+            "layoutMs": 12.72,
+            "transformMs": 105.24,
+            "totalMs": 127.31
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": 10.8,
+            "aggregateHeapMB": 11,
+            "layoutHeapMB": 12.8,
+            "baselineRssMB": 47.2,
+            "maxRssMB": 82.5
+          },
+          "wallMs": 238.18
+        },
+        {
+          "stages": {
+            "generateMs": 22.67,
+            "aggregateMs": 91.64,
+            "mergeMs": null,
+            "layoutMs": 13.12,
+            "transformMs": 104.76,
+            "totalMs": 127.44
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": 10.8,
+            "aggregateHeapMB": 11,
+            "layoutHeapMB": 12.8,
+            "baselineRssMB": 47.3,
+            "maxRssMB": 82
+          },
+          "wallMs": 240.79
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "rows": 1000000,
+      "mode": "single",
+      "chunkSize": null,
+      "stages": {
+        "generateMs": 242.84,
+        "aggregateMs": 826.76,
+        "mergeMs": null,
+        "layoutMs": 21.84,
+        "transformMs": 848.61,
+        "totalMs": 1091.45
+      },
+      "memory": {
+        "baselineHeapMB": 3.9,
+        "generateHeapMB": 72.6,
+        "aggregateHeapMB": 72.8,
+        "layoutHeapMB": 74.6,
+        "baselineRssMB": 47.3,
+        "maxRssMB": 249.2
+      },
+      "output": {
+        "cubeRows": 1536,
+        "gridRows": 64,
+        "gridCols": 24,
+        "cells": 1536
+      },
+      "runtime": {
+        "node": "v24.22.2",
+        "platform": "linux",
+        "arch": "x64"
+      },
+      "wallMs": 1444.29,
+      "repeats": 3,
+      "samples": [
+        {
+          "stages": {
+            "generateMs": 243.95,
+            "aggregateMs": 890.08,
+            "mergeMs": null,
+            "layoutMs": 22.24,
+            "transformMs": 912.31,
+            "totalMs": 1156.26
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": 72.6,
+            "aggregateHeapMB": 72.8,
+            "layoutHeapMB": 74.6,
+            "baselineRssMB": 47.1,
+            "maxRssMB": 248.1
+          },
+          "wallMs": 1479.87
+        },
+        {
+          "stages": {
+            "generateMs": 204.25,
+            "aggregateMs": 809.6,
+            "mergeMs": null,
+            "layoutMs": 22.28,
+            "transformMs": 831.89,
+            "totalMs": 1036.14
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": 72.6,
+            "aggregateHeapMB": 72.8,
+            "layoutHeapMB": 74.6,
+            "baselineRssMB": 47.3,
+            "maxRssMB": 244.4
+          },
+          "wallMs": 1358.66
+        },
+        {
+          "stages": {
+            "generateMs": 242.84,
+            "aggregateMs": 826.76,
+            "mergeMs": null,
+            "layoutMs": 21.84,
+            "transformMs": 848.61,
+            "totalMs": 1091.45
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": 72.6,
+            "aggregateHeapMB": 72.8,
+            "layoutHeapMB": 74.6,
+            "baselineRssMB": 47.3,
+            "maxRssMB": 249.2
+          },
+          "wallMs": 1444.29
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "rows": 10000000,
+      "mode": "chunked",
+      "chunkSize": 200000,
+      "stages": {
+        "generateMs": 566.63,
+        "aggregateMs": 7959.62,
+        "mergeMs": 32.87,
+        "layoutMs": 10.85,
+        "transformMs": 8003.35,
+        "totalMs": 8569.97
+      },
+      "memory": {
+        "baselineHeapMB": 3.9,
+        "generateHeapMB": null,
+        "aggregateHeapMB": 17.4,
+        "layoutHeapMB": 19.2,
+        "baselineRssMB": 47.2,
+        "maxRssMB": 184.1
+      },
+      "output": {
+        "cubeRows": 1536,
+        "gridRows": 64,
+        "gridCols": 24,
+        "cells": 1536
+      },
+      "runtime": {
+        "node": "v24.22.2",
+        "platform": "linux",
+        "arch": "x64"
+      },
+      "wallMs": 8715.32,
+      "repeats": 3,
+      "samples": [
+        {
+          "stages": {
+            "generateMs": 969.14,
+            "aggregateMs": 8299.62,
+            "mergeMs": 35.07,
+            "layoutMs": 11.3,
+            "transformMs": 8345.99,
+            "totalMs": 9315.13
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": null,
+            "aggregateHeapMB": 17.4,
+            "layoutHeapMB": 19.2,
+            "baselineRssMB": 47.2,
+            "maxRssMB": 202.8
+          },
+          "wallMs": 9484.77
+        },
+        {
+          "stages": {
+            "generateMs": 566.63,
+            "aggregateMs": 7959.62,
+            "mergeMs": 32.87,
+            "layoutMs": 10.85,
+            "transformMs": 8003.35,
+            "totalMs": 8569.97
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": null,
+            "aggregateHeapMB": 17.4,
+            "layoutHeapMB": 19.2,
+            "baselineRssMB": 47.2,
+            "maxRssMB": 184.1
+          },
+          "wallMs": 8715.32
+        },
+        {
+          "stages": {
+            "generateMs": 673.97,
+            "aggregateMs": 7766.3,
+            "mergeMs": 33.83,
+            "layoutMs": 14.27,
+            "transformMs": 7814.41,
+            "totalMs": 8488.38
+          },
+          "memory": {
+            "baselineHeapMB": 3.9,
+            "generateHeapMB": null,
+            "aggregateHeapMB": 17.4,
+            "layoutHeapMB": 19.2,
+            "baselineRssMB": 47.3,
+            "maxRssMB": 200.2
+          },
+          "wallMs": 8615.26
+        }
+      ]
+    }
+  ]
+}
