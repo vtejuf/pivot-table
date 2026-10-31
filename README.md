@@ -27,6 +27,8 @@ src/
     geometry.mjs       纯几何：视口、屏幕矩形、冻结表头
     canvas-renderer.mjs Canvas 2D 绘制
     theme.mjs          默认主题与颜色工具
+  features/
+    dual-measure.mjs   并列度量：度量作为最末列维度（附加功能）
 site/
   main.mjs             主页导航与 Demo 初始化
   demo.mjs             主页 / 示例共用的 Demo 控制器
@@ -34,6 +36,9 @@ site/
 test/
   model/               聚合与布局测试
   render/              几何、绘制、主题测试
+  features/
+    dual-measure.test.mjs  并列度量测试
+  architecture.test.mjs    核心不反向依赖 features
 examples/
   demo.mjs             终端输出布局结果
   canvas.html          独立 Canvas 示例（复用 site/demo.mjs）
@@ -58,7 +63,8 @@ docs/
 ```bash
 # Node：模型示例与测试
 node examples/demo.mjs
-node --test test/model/*.test.mjs test/render/*.test.mjs
+node --test test/model/*.test.mjs test/render/*.test.mjs \
+  test/features/*.test.mjs test/architecture.test.mjs
 
 # 基准测试（写 bench/results.json）
 node bench/run.mjs
@@ -193,6 +199,8 @@ const { geometry, stats } = renderPivot(canvas, result, {
 
 - 多层行 / 列表头，滚动时冻结在视口边缘；
 - 视口虚拟化，只遍历并绘制可见单元格，网格线批量描边；
+- **并列度量**：feature 层把度量作为列轴最末维度，Demo 工具栏可开关；
+  双度量模式只处理布局，不启用热力图；
 - 数值色阶（热力图）与自动对比文字颜色；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；
 - 传入 canvas 时按 DPR 设置物理像素，也可直接传 2D context；

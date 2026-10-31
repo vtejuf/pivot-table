@@ -5,11 +5,15 @@
  *   [data-demo-canvas]   canvas（必需）
  *   [data-demo-mode]     布局模式 select：compact / cartesian
  *   [data-demo-measure]  度量 select：sales / count
+ *   [data-demo-dual-measure] 并列度量 checkbox
  *   [data-demo-heatmap]  数值色阶 checkbox
  *   [data-demo-width]    列宽 range
  *   [data-demo-reset]    重置滚动按钮
  *   [data-demo-zoom]     列宽显示
  *   [data-demo-grid-size] / [data-demo-stats] / [data-demo-matrix] 状态文本
+ *
+ * 并列度量只负责布局数据：度量作为列轴最末层维度。双度量模式下先关闭
+ * 热力图；双度量热力是后续独立的 feature。
  *
  * 后续扩展点（小计/总计、折叠/展开）：
  * - 在 rebuildLayout() 里对聚合行做附加处理，再交给 layoutPivot；
@@ -19,6 +23,7 @@
 
 import { layoutPivot } from '../src/model/index.mjs';
 import { renderPivot } from '../src/render/index.mjs';
+import { combineMeasures } from '../src/features/dual-measure.mjs';
 import { salesCube, countCube } from '../examples/sample-data.mjs';
 
 const DEFAULT_CELL_WIDTH = 104;
@@ -34,6 +39,7 @@ export function createPivotDemo(root = document, options = {}) {
   const stage = canvas.parentElement ?? canvas;
   const modeSelect = scope.querySelector('[data-demo-mode]');
   const measureSelect = scope.querySelector('[data-demo-measure]');
+  const dualInput = scope.querySelector('[data-demo-dual-measure]');
   const heatmapInput = scope.querySelector('[data-demo-heatmap]');
   const widthInput = scope.querySelector('[data-demo-width]');
   const resetButton = scope.querySelector('[data-demo-reset]');
@@ -51,10 +57,27 @@ export function createPivotDemo(root = document, options = {}) {
       ? options.width
       : () => Math.max(320, stage.clientWidth || 0);
 
+  const dualCube = combineMeasures({
+    dimensions: salesCube.dimensions,
+    measures: [
+      {
+        label: '销售额',
+        rows: salesCube.rows,
+        valueField: salesCube.measure.key,
+      },
+      {
+        label: '订单数',
+        rows: countCube.rows,
+        valueField: countCube.measure.key,
+      },
+    ],
+  });
+
   let layout = null;
   let scrollX = 0;
   let scrollY = 0;
   let lastGeometry = null;
+  let heatmapBeforeDual = heatmapInput?.checked ?? true;
   const cleanups = [];
 
   const listen = (target, type, handler, listenerOptions) => {
@@ -65,12 +88,29 @@ export function createPivotDemo(root = document, options = {}) {
 
   const currentCube = () =>
     measureSelect?.value === 'count' ? countCube : salesCube;
+  const isDual = () => Boolean(dualInput?.checked);
+
+  function syncDualControls(dual) {
+    if (measureSelect) measureSelect.disabled = dual;
+    if (!heatmapInput) return;
+
+    if (dual) {
+      heatmapBeforeDual = heatmapInput.checked;
+      heatmapInput.checked = false;
+      heatmapInput.title = '并列度量模式暂不支持热力图';
+    } else {
+      heatmapInput.checked = heatmapBeforeDual;
+      heatmapInput.title = '';
+    }
+    heatmapInput.disabled = dual;
+  }
 
   function rebuildLayout(resetScroll = true) {
-    const cube = currentCube();
+    const dual = isDual();
+    const cube = dual ? dualCube : currentCube();
     layout = layoutPivot(cube.rows, {
       dimensions: cube.dimensions,
-      value: cube.measure.key,
+      value: dual ? cube.value : cube.measure.key,
       mode: modeSelect?.value ?? 'compact',
     });
     if (resetScroll) {
@@ -93,7 +133,8 @@ export function createPivotDemo(root = document, options = {}) {
       },
       cellSize: { width: cellWidth, height: 28 },
       headerSize: { row: Math.max(68, Math.round(cellWidth * 0.86)), col: 28 },
-      heatmap: heatmapInput ? heatmapInput.checked : true,
+      // 并列度量只处理布局；双度量热力是后续独立 feature。
+      heatmap: isDual() ? false : heatmapInput ? heatmapInput.checked : true,
       formatValue: (value) =>
         typeof value === 'number' ? value.toLocaleString('zh-CN') : String(value),
     });
@@ -110,7 +151,8 @@ export function createPivotDemo(root = document, options = {}) {
     if (gridSizeEl) {
       gridSizeEl.innerHTML =
         `<strong>${layout.size.rows} 行 × ${layout.size.cols} 列</strong>` +
-        ` · ${layout.mode}`;
+        ` · ${layout.mode}` +
+        (isDual() ? ' · 并列度量' : '');
     }
 
     if (statsEl) {
@@ -129,6 +171,10 @@ export function createPivotDemo(root = document, options = {}) {
 
   listen(modeSelect, 'change', () => rebuildLayout());
   listen(measureSelect, 'change', () => rebuildLayout());
+  listen(dualInput, 'change', () => {
+    syncDualControls(isDual());
+    rebuildLayout();
+  });
   listen(heatmapInput, 'change', render);
   listen(widthInput, 'input', render);
   listen(resetButton, 'click', () => {
@@ -232,6 +278,7 @@ export function createPivotDemo(root = document, options = {}) {
     listen(window, 'resize', render);
   }
 
+  if (dualInput) syncDualControls(isDual());
   rebuildLayout();
 
   return {

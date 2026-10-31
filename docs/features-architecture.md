@@ -1,8 +1,8 @@
 # 附加功能架构设计（设计稿）
 
-- **状态**：设计稿，未实现。本次只保存设计，不创建目录、不写特性代码。
+- **状态**：设计稿；并列度量已作为第一个 feature 实现，小计 / 总计、折叠 / 展开等仍未实现。
 - **日期**：2026-10-31
-- **范围**：小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
+- **范围**：并列度量、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
 - **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
 
 ## 1. 目标
@@ -39,24 +39,38 @@
 
 ## 3. 目录规划
 
-未来实现第一个附加功能时再创建目录，当前不建空目录：
+第一个 feature（并列度量）已落地；其余目录在对应功能实现时再创建：
 
 ```
 src/
   model/         核心：聚合、矩阵布局（冻结）
   render/        核心：几何、Canvas、主题（冻结）
   features/      附加业务能力
-    index.mjs    可选：feature 统一入口
-    subtotals.mjs
-    collapse.mjs
+    dual-measure.mjs  已实现：并列度量布局
+    index.mjs         可选：feature 统一入口（尚未创建）
+    subtotals.mjs     规划中
+    collapse.mjs      规划中
 test/
   features/
-    subtotals.test.mjs
-    collapse.test.mjs
-  architecture.test.mjs   可选：依赖方向守卫
+    dual-measure.test.mjs  已实现
+    subtotals.test.mjs     规划中
+    collapse.test.mjs      规划中
+  architecture.test.mjs    已实现：依赖方向守卫
 ```
 
 文件名先保持扁平；单个 feature 变大后再拆成 `features/subtotals/` 等子目录。
+
+## 3.1 已实现：并列度量
+
+`src/features/dual-measure.mjs` 把多个 aggregate 结果展开成长表，并把
+“度量”作为列轴最末一层维度，再交给核心 `layoutPivot`。
+
+- 输入：`dimensions` + `measures: [{ label, rows, valueField }]`；
+- 输出：长表 `rows`、追加 measure 维度的 `dimensions`、`value` 字段名；
+- 核心矩阵、表头、`cellMap` 与渲染器均未修改；
+- 双度量模式只处理布局，热力图关闭；双度量热力是后续独立 feature；
+  现有核心热力图本次不迁移，热力图 feature 化是另一个独立任务；
+- 架构守卫测试确保 `src/model` / `src/render` 不反向依赖 `features`。
 
 ## 4. 依赖规则
 
@@ -154,6 +168,7 @@ site / examples / bench
 - 创建 `src/features/` 或 `test/features/` 空目录；
 - 实现小计 / 总计；
 - 实现折叠 / 展开；
+- 迁移或扩展热力图；
 - 修改核心 `aggregate` / `layoutPivot` / `renderPivot`；
 - 引入插件注册器、事件总线或新的运行时依赖。
 

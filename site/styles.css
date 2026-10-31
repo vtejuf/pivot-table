@@ -751,6 +751,16 @@ canvas:focus-visible {
   accent-color: var(--accent);
 }
 
+.check input:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .demo-toolbar .button {
   margin-left: auto;
 }

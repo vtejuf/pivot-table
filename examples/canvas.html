@@ -106,6 +106,14 @@
         height: 16px;
         accent-color: var(--accent);
       }
+      .check input:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+      select:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
       .range {
         display: flex;
         align-items: center;
@@ -219,6 +227,10 @@
               <option value="sales">销售额 sum</option>
               <option value="count">订单数 count</option>
             </select>
+          </label>
+          <label class="check">
+            <input id="dual-measure" type="checkbox" data-demo-dual-measure />
+            并列度量
           </label>
           <label class="check">
             <input id="heatmap" type="checkbox" data-demo-heatmap checked />
