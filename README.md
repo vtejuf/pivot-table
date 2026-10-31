@@ -289,14 +289,14 @@ node bench/depth-run.mjs --heap 1024
 
 部署到 GitHub Pages：
 
-1. 将主页改动合并到要发布的分支（通常是 `main`）。
-2. 打开仓库 **Settings → Pages → Build and deployment**。
-3. Source 选择 **Deploy from a branch**，分支选择 `main`，目录选择 `/ (root)`。
-4. 保存后访问 `https://<user>.github.io/pivot-table/`，本项目为
+1. 打开仓库 **Settings → Pages → Build and deployment**。
+2. Source 选择 **Deploy from a branch**，分支选择 `dev`，目录选择 `/ (root)`。
+3. 保存后访问 `https://<user>.github.io/pivot-table/`，本项目为
    `https://vtejuf.github.io/pivot-table/`。
 
 `.nojekyll` 让 Pages 跳过 Jekyll，直接按静态文件发布 `src/`、`site/` 等目录。
-如果主页改动还在 `dev` 分支，需要先合并到发布分支才会更新线上站点。
+发布分支是 `dev`：主页改动提交并推送到 `dev` 后即更新线上站点。
+`main` 不参与发布，由维护者手动合并。
 
 ## 当前假设
 
