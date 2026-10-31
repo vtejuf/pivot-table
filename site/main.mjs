@@ -1,5 +1,6 @@
 import { createPivotDemo } from './demo.mjs';
 import { renderBenchmark } from './bench.mjs';
+import { renderDepthExperiment } from './depth.mjs';
 
 /* -------------------------------------------------------------------------- */
 /* 侧栏导航高亮                                                               */
@@ -65,3 +66,4 @@ try {
 }
 
 renderBenchmark();
+renderDepthExperiment();

@@ -1048,6 +1048,86 @@ kbd {
 }
 
 /* ------------------------------------------------------------------------- */
+/* Depth sweep                                                                */
+/* ------------------------------------------------------------------------- */
+
+.depth-subhead {
+  margin: 28px 0 12px;
+  color: #334155;
+  font-size: 15px;
+}
+
+.depth-table {
+  min-width: 720px;
+}
+
+.depth-table th:nth-child(-n + 2),
+.depth-table td:nth-child(-n + 2) {
+  text-align: left;
+}
+
+.depth-time {
+  display: grid;
+  gap: 4px;
+  min-width: 110px;
+  text-align: right;
+}
+
+.depth-time__value {
+  font-variant-numeric: tabular-nums;
+}
+
+.depth-bar {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.depth-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #93c5fd, #2563eb);
+}
+
+.depth-bar i.is-over {
+  background: var(--danger);
+}
+
+.depth-stop {
+  margin: 0 0 4px;
+  border-left: 3px solid var(--danger);
+  border-radius: 0 8px 8px 0;
+  background: #fef2f2;
+  padding: 10px 14px;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.depth-stop.is-time {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  color: #1e3a8a;
+}
+
+.depth-stop.is-complete {
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.depth-failed td {
+  background: #fff7f7;
+  color: var(--danger);
+}
+
+.depth-table td:last-child {
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------------- */
 /* Quickstart                                                                 */
 /* ------------------------------------------------------------------------- */
 

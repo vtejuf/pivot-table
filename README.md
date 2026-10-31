@@ -45,6 +45,9 @@ bench/
   run.mjs              多规模运行器（独立进程、3 次中位数）
   verify.mjs           校验分片聚合与单次结果一致
   results.json         最新实测结果（主页基准表格读取）
+  depth-step.mjs       单个行/列深度组合的变换基准
+  depth-run.mjs        维度深度扫描运行器
+  depth-results.json   深度实验结果（主页读取）
 docs/
   matrix-transform.md  矩阵推导与 cartesian/compact 差异
   rendering.md         Canvas 渲染管线与性能方案
@@ -60,6 +63,7 @@ node --test test/model/*.test.mjs test/render/*.test.mjs
 # 基准测试（写 bench/results.json）
 node bench/run.mjs
 node bench/verify.mjs
+node bench/depth-run.mjs
 ```
 
 主页和浏览器示例需要通过 HTTP 打开（ES module 不能走 `file://`）：
@@ -231,6 +235,30 @@ WebGL 的取舍见 [docs/rendering.md](docs/rendering.md)。
 node bench/run.mjs
 node bench/verify.mjs
 ```
+
+### 维度深度实验（100 万条）
+
+固定 100 万条明细，输入对象固定包含 20 个维度字段，每次只激活
+`rowDepth + colDepth` 个维度；每层 2 个成员，因此行网格 = 2^行深、
+列网格 = 2^列深。顺序是先增加行深度 1..10（列深 0），再固定行深 10、
+增加列深度 1..10。
+
+- 每个组合独立 Node 进程，堆上限 768 MB；每步只运行一次，用于观察趋势。
+- 停止条件看**矩阵变换（layoutPivot）**耗时是否超过 3 秒，聚合耗时单独记录；
+  内存不足也会停止。
+- 行阶段 1..10：矩阵变换 1.9–25.9 ms，峰值 320–431 MB；聚合 0.57–1.92 s，
+  行深度主要增加的是聚合成本。
+- 列阶段（行深 10）1..7：矩阵变换 75 ms / 108 ms / 175 ms / 271 ms /
+  437 ms / 1.18 s / 2.74 s；峰值内存 453–745 MB。
+- 列深 8：768 MB 堆 OOM，实验以内存受限停止；3 秒矩阵变换阈值未测到。
+
+```bash
+node bench/depth-run.mjs
+# 内存更大的机器可放宽堆上限继续：
+node bench/depth-run.mjs --heap 1024
+```
+
+完整结果见 `bench/depth-results.json`，主页的“深度实验”区会读取并展示。
 
 ## 主页与 GitHub Pages
 

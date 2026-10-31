@@ -53,7 +53,8 @@
           <a class="site-nav__link" href="#demo"><span>04</span>可视化 Demo</a>
           <a class="site-nav__link" href="#performance"><span>05</span>性能方案</a>
           <a class="site-nav__link" href="#benchmark"><span>06</span>基准测试</a>
-          <a class="site-nav__link" href="#quickstart"><span>07</span>快速开始</a>
+          <a class="site-nav__link" href="#depth"><span>07</span>深度实验</a>
+          <a class="site-nav__link" href="#quickstart"><span>08</span>快速开始</a>
         </nav>
 
         <div class="sidebar__footer">
@@ -490,9 +491,134 @@ y  =  [   3       1      0     0 ] · v</pre>
           </p>
         </section>
 
+        <section id="depth" class="section">
+          <header class="section__head">
+            <p class="eyebrow">07 · depth sweep</p>
+            <h2>维度越深，矩阵变换要多久？</h2>
+            <p>
+              固定 100 万条明细，先加行维度、再加列维度，每层 2 个成员。
+              停止条件看矩阵变换（layoutPivot）是否超过 3 秒，同时记录聚合耗时和峰值内存。
+            </p>
+          </header>
+
+          <div class="bench-summary">
+            <article class="metric">
+              <strong data-depth-summary="last">—</strong>
+              <span>完成到 · 行深 / 列深</span>
+            </article>
+            <article class="metric">
+              <strong data-depth-summary="matrix">—</strong>
+              <span>最后一步 · 矩阵变换</span>
+            </article>
+            <article class="metric">
+              <strong data-depth-summary="memory">—</strong>
+              <span>最后一步 · 峰值内存</span>
+            </article>
+          </div>
+
+          <p class="depth-stop" data-depth-stop>正在加载深度实验结果…</p>
+
+          <h3 class="depth-subhead">先增加行维度（列深 0）</h3>
+          <div class="bench-card">
+            <div class="bench-table-wrap">
+              <table class="bench-table depth-table">
+                <thead>
+                  <tr>
+                    <th scope="col">行深</th>
+                    <th scope="col">列深</th>
+                    <th scope="col">聚合</th>
+                    <th scope="col">矩阵变换</th>
+                    <th scope="col">合计</th>
+                    <th scope="col">峰值内存</th>
+                    <th scope="col">输出</th>
+                  </tr>
+                </thead>
+                <tbody data-depth-rows>
+                  <tr>
+                    <td colspan="7">正在加载…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <h3 class="depth-subhead">再增加列维度（行深 10）</h3>
+          <div class="bench-card">
+            <div class="bench-table-wrap">
+              <table class="bench-table depth-table">
+                <thead>
+                  <tr>
+                    <th scope="col">行深</th>
+                    <th scope="col">列深</th>
+                    <th scope="col">聚合</th>
+                    <th scope="col">矩阵变换</th>
+                    <th scope="col">合计</th>
+                    <th scope="col">峰值内存</th>
+                    <th scope="col">输出</th>
+                  </tr>
+                </thead>
+                <tbody data-depth-cols>
+                  <tr>
+                    <td colspan="7">正在加载…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bench-detail">
+            <div>
+              <h3>怎么测的</h3>
+              <ul class="checklist" data-depth-notes>
+                <li>加载中…</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>读数</h3>
+              <ul class="plan-list">
+                <li>
+                  <strong>行深度主要增加聚合成本</strong>
+                  <span>本次测量中，行阶段网格最大只有 1,024 格，矩阵变换 1.9–25.9 ms；主要时间花在 100 万条明细分组上。</span>
+                </li>
+                <li>
+                  <strong>列深度让网格翻倍</strong>
+                  <span>本次测量中，行网格固定 1,024，列每加一层翻倍；矩阵变换从 75 ms 增长到 2.74 s。</span>
+                </li>
+                <li>
+                  <strong>内存先到达上限</strong>
+                  <span>列深 7 峰值 744.8 MB；列深 8 在 768 MB 堆上 OOM，未完成，因此 3 秒阈值没有被测到。</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <p class="bench-meta" data-depth-meta>
+            实验数据来自 bench/depth-results.json；页面需要通过 HTTP 打开。
+          </p>
+
+          <p class="bench-source">
+            结果文件：
+            <a
+              href="https://github.com/vtejuf/pivot-table/blob/main/bench/depth-results.json"
+              target="_blank"
+              rel="noreferrer"
+            >
+              bench/depth-results.json
+            </a>
+            · 复现：<code>node bench/depth-run.mjs</code> · 脚本：
+            <a
+              href="https://github.com/vtejuf/pivot-table/blob/main/bench/depth-run.mjs"
+              target="_blank"
+              rel="noreferrer"
+            >
+              bench/depth-run.mjs
+            </a>
+          </p>
+        </section>
+
         <section id="quickstart" class="section">
           <header class="section__head">
-            <p class="eyebrow">07 · quickstart</p>
+            <p class="eyebrow">08 · quickstart</p>
             <h2>直接使用</h2>
             <p>没有构建步骤，没有运行时依赖。模型和渲染都是原生 ES Modules。</p>
           </header>
