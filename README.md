@@ -1,5 +1,7 @@
 # pivot-table
 
+**在线主页：<https://vtejuf.github.io/pivot-table/>**
+
 把一组 JSON 记录布局成透视表二维网格，并渲染到 Canvas。代码按两个模块组织：
 
 1. **数据模型**：明细记录 → 聚合 → 矩阵变换 → 二维网格向量。
@@ -8,8 +10,8 @@
 布局层不做任何 sum / avg / count，聚合层也不关心行列和矩阵；渲染层只消费
 布局结果，不做聚合。
 
-GitHub Pages 主页（部署后）：`https://vtejuf.github.io/pivot-table/`。
-主页包含算法说明、可交互 Demo 和性能方案，左侧菜单、右侧内容。
+[GitHub Pages 主页](https://vtejuf.github.io/pivot-table/) 包含算法说明、可交互 Demo
+和性能方案，左侧菜单、右侧内容。
 
 ## 目录结构
 
