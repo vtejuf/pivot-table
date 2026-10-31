@@ -199,17 +199,19 @@ compact 模式省掉补齐的空单元格，但 `points` 和 `transforms` 仍按
 - `dimensions` 必填；每个维度必须显式指定 `axis: 'row' | 'col'`。父子关系用 `parent` 显式给出，根维度省略 `parent`。
 - `value` 必填；布局层只读取该字段，不做聚合。
 - 重复维度组合默认报错；也可显式指定 `duplicate: 'first' | 'last'`，但推荐先调用 `aggregate()`。
-- 输出是整数网格坐标；像素换算交给 `result.toPixel({ width, height })` 或渲染层。
+- 输出是整数网格坐标与二维向量；像素换算交给渲染层的 `computePivotGeometry()`，`result.toPixel({ width, height })` 保留为简单的等距换算辅助。
 - 当前平移为 0。若未来支持自定义原点，只需修改 `M` 的最后一列，不影响 `span` 结构。
 
 ## 12. 实现映射
 
-- `src/aggregate.mjs`：聚合层，把明细压成每个维度组合唯一的数据。
-- `src/pivot-layout.mjs`：
+- `src/model/aggregate.mjs`：聚合层，把明细压成每个维度组合唯一的数据。
+- `src/model/pivot-layout.mjs`：
   - `normalizeDimensions` / `buildChain`：维度校验与单链检查。
   - `collectMembers`：成员收集、稳定键和排序。
   - `buildLevel`：递归构建层级树，计算每个成员的 `size` 和 `offset`。
   - `locate`：记录 → 层级路径与绝对坐标。
   - `layoutPivot` 内部的 `spans` Map 与 `matrix` 构造：全局矩阵。
   - `axisResult` / `headerOf`：递归表头。
-  - `toPixel`：网格坐标到像素坐标的辅助函数。
+  - `toPixel`：网格坐标到像素坐标的简单辅助函数。
+- `src/render/geometry.mjs`：屏幕矩形、可见范围、冻结表头与裁剪区域。
+- `src/render/canvas-renderer.mjs`：Canvas 2D 绘制，只遍历视口内单元格。

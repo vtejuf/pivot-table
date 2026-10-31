@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pivot-table · Canvas 渲染示例</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #0f172a;
+        --muted: #64748b;
+        --line: #e2e8f0;
+        --panel: #ffffff;
+        --accent: #2563eb;
+        --page: #f1f5f9;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font:
+          14px/1.5 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      main {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 28px 20px 40px;
+      }
+      header h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        letter-spacing: 0.01em;
+      }
+      header p {
+        margin: 0 0 20px;
+        color: var(--muted);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgb(15 23 42 / 0.06);
+        overflow: hidden;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 16px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+      .field {
+        display: grid;
+        gap: 4px;
+      }
+      .field span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      select,
+      button {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        color: inherit;
+        font: inherit;
+        padding: 7px 10px;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:hover,
+      select:hover {
+        border-color: #94a3b8;
+      }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding-bottom: 8px;
+      }
+      .check input {
+        accent-color: var(--accent);
+        width: 16px;
+        height: 16px;
+      }
+      .range {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-bottom: 7px;
+      }
+      .range input {
+        width: 140px;
+        accent-color: var(--accent);
+      }
+      #zoom-label {
+        width: 44px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      #pivot {
+        display: block;
+        width: 100%;
+        height: 560px;
+        cursor: grab;
+        touch-action: none;
+      }
+      #pivot.dragging {
+        cursor: grabbing;
+      }
+      .status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 20px;
+        padding: 12px 16px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+      .status strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .hint {
+        margin: 12px 2px 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      code {
+        background: #e2e8f0;
+        border-radius: 4px;
+        padding: 1px 5px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>pivot-table 可视化</h1>
+        <p>
+          明细 -> 聚合 -> 矩阵布局 -> Canvas 2D。滚轮或拖拽平移，表头保持冻结；
+          只绘制视口内的单元格。cartesian 会在每个父成员下补齐全局子成员，
+          空单元格更多；compact 只排列实际出现的组合。
+        </p>
+      </header>
+
+      <section class="panel">
+        <div class="toolbar">
+          <label class="field">
+            <span>布局模式</span>
+            <select id="mode">
+              <option value="compact" selected>compact · 紧凑块</option>
+              <option value="cartesian">cartesian · 规则网格（全局补齐）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>度量</span>
+            <select id="measure">
+              <option value="sales">销售额 sum</option>
+              <option value="count">订单数 count</option>
+            </select>
+          </label>
+          <label class="check">
+            <input id="heatmap" type="checkbox" checked />
+            数值色阶
+          </label>
+          <label class="range">
+            <span>列宽</span>
+            <input id="cell-width" type="range" min="56" max="168" step="4" value="104" />
+            <span id="zoom-label">104px</span>
+          </label>
+          <button id="reset" type="button">回到左上角</button>
+        </div>
+        <canvas id="pivot"></canvas>
+        <div class="status">
+          <span id="grid-size"></span>
+          <span id="stats"></span>
+          <span id="matrix-info"></span>
+        </div>
+      </section>
+
+      <p class="hint">
+        浏览器需要通过 HTTP 打开（ES module 不能走 file://）：<code>python3 -m http.server 8000</code>，
+        然后访问 <code>http://localhost:8000/examples/canvas.html</code>。
+      </p>
+    </main>
+
+    <script type="module">
+      import { layoutPivot } from '../src/model/index.mjs';
+      import { renderPivot } from '../src/render/index.mjs';
+      // 示例数据在 Node 与浏览器间共享，便于单独验证聚合与布局。
+      import { salesCube, countCube } from './sample-data.mjs';
+
+      const canvas = document.getElementById('pivot');
+      const wrap = canvas.parentElement;
+      const modeSelect = document.getElementById('mode');
+      const measureSelect = document.getElementById('measure');
+      const heatmapInput = document.getElementById('heatmap');
+      const widthInput = document.getElementById('cell-width');
+      const zoomLabel = document.getElementById('zoom-label');
+      const resetButton = document.getElementById('reset');
+      const gridSizeEl = document.getElementById('grid-size');
+      const statsEl = document.getElementById('stats');
+      const matrixInfoEl = document.getElementById('matrix-info');
+
+      let layout = null;
+      let scrollX = 0;
+      let scrollY = 0;
+
+      function currentCube() {
+        return measureSelect.value === 'count' ? countCube : salesCube;
+      }
+
+      function rebuildLayout(resetScroll = true) {
+        const cube = currentCube();
+        layout = layoutPivot(cube.rows, {
+          dimensions: cube.dimensions,
+          value: cube.measure.key,
+          mode: modeSelect.value,
+        });
+        if (resetScroll) {
+          scrollX = 0;
+          scrollY = 0;
+        }
+        render();
+      }
+
+      function render() {
+        if (!layout) return;
+        const cellWidth = Number(widthInput.value);
+        const width = Math.max(320, wrap.clientWidth);
+        const height = 560;
+
+        const { geometry, stats } = renderPivot(canvas, layout, {
+          viewport: { width, height, scrollX, scrollY },
+          cellSize: { width: cellWidth, height: 28 },
+          headerSize: { row: Math.max(68, Math.round(cellWidth * 0.86)), col: 28 },
+          heatmap: heatmapInput.checked,
+          formatValue: (value) =>
+            typeof value === 'number' ? value.toLocaleString('zh-CN') : String(value),
+        });
+
+        // 渲染时视口会 clamp 滚动偏移，回写到本地状态。
+        scrollX = geometry.viewport.scrollX;
+        scrollY = geometry.viewport.scrollY;
+
+        zoomLabel.textContent = `${cellWidth}px`;
+        gridSizeEl.innerHTML =
+          `<strong>${layout.size.rows} 行 × ${layout.size.cols} 列</strong>` +
+          ` · ${layout.mode}`;
+        statsEl.innerHTML =
+          `绘制 <strong>${stats.drawnCells}</strong>/${stats.cellsInGrid} 格` +
+          ` · 表头 <strong>${stats.headerCells}</strong> 块` +
+          ` · 网格线 <strong>${stats.gridLines}</strong> 条`;
+        matrixInfoEl.textContent = layout.matrix
+          ? `固定矩阵 · ${layout.matrix.length}×${layout.matrix[0].length}`
+          : '分段仿射 · 无全局矩阵';
+      }
+
+      modeSelect.addEventListener('change', () => rebuildLayout());
+      measureSelect.addEventListener('change', () => rebuildLayout());
+      heatmapInput.addEventListener('change', render);
+      widthInput.addEventListener('input', render);
+      resetButton.addEventListener('click', () => {
+        scrollX = 0;
+        scrollY = 0;
+        render();
+      });
+
+      canvas.addEventListener(
+        'wheel',
+        (event) => {
+          event.preventDefault();
+          const unit = event.deltaMode === 1 ? 16 : 1;
+          scrollX += (event.shiftKey ? event.deltaY : event.deltaX) * unit;
+          scrollY += (event.shiftKey ? 0 : event.deltaY) * unit;
+          render();
+        },
+        { passive: false },
+      );
+
+      let drag = null;
+      canvas.addEventListener('pointerdown', (event) => {
+        drag = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          scrollX,
+          scrollY,
+        };
+        canvas.setPointerCapture(event.pointerId);
+        canvas.classList.add('dragging');
+      });
+      canvas.addEventListener('pointermove', (event) => {
+        if (!drag) return;
+        scrollX = drag.scrollX - (event.clientX - drag.startX);
+        scrollY = drag.scrollY - (event.clientY - drag.startY);
+        render();
+      });
+      const endDrag = (event) => {
+        if (!drag) return;
+        drag = null;
+        canvas.classList.remove('dragging');
+        if (canvas.hasPointerCapture(event.pointerId)) {
+          canvas.releasePointerCapture(event.pointerId);
+        }
+      };
+      canvas.addEventListener('pointerup', endDrag);
+      canvas.addEventListener('pointercancel', endDrag);
+
+      new ResizeObserver(() => render()).observe(wrap);
+      rebuildLayout();
+    </script>
+  </body>
+</html>

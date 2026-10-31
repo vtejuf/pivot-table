@@ -1,5 +1,4 @@
-import { aggregate } from '../src/aggregate.mjs';
-import { layoutPivot } from '../src/pivot-layout.mjs';
+import { aggregate, layoutPivot } from '../src/model/index.mjs';
 
 const rows = [
   { region: '华东', city: '杭州', year: 2023, sales: 10 },

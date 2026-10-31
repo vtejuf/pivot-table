@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregate } from '../src/aggregate.mjs';
+import { aggregate } from '../../src/model/aggregate.mjs';
 
 const dimensions = [
   { key: 'region', axis: 'row' },

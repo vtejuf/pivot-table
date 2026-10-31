@@ -22,6 +22,9 @@
  * - compact：只排列数据中实际出现的成员组合。父成员块大小可变，矩阵退化
  *   为逐记录的分段仿射变换；每条记录仍返回 transforms（每个属性一次平移）。
  *
+ * 输出中每个单元格都带二维空间向量 vector: [x, y]；cells 是排序后的集合，
+ * cellMap 是 `${x},${y}` -> cell 的哈希索引。
+ *
  * 限制：每个轴只支持一条层级链（单根、每个维度最多一个子维度）。
  */
 
@@ -132,8 +135,10 @@ export function layoutPivot(rows, options = {}) {
 
     if (!existing || duplicate === 'last') {
       cells.set(key, {
+        key,
         x: colPos.offset,
         y: rowPos.offset,
+        vector: [colPos.offset, rowPos.offset],
         value: record[valueField] ?? null,
         members,
         record,
@@ -143,6 +148,7 @@ export function layoutPivot(rows, options = {}) {
     points.push({
       x: colPos.offset,
       y: rowPos.offset,
+      vector: [colPos.offset, rowPos.offset],
       record,
       members,
       indexes,
@@ -194,6 +200,8 @@ export function layoutPivot(rows, options = {}) {
     matrix,
     dimensionVectors,
     cells: sortedCells,
+    /** `${x},${y}` -> cell，供渲染或命中测试直接按坐标取值。 */
+    cellMap: cells,
     points,
     axes: {
       row: rowRoot ? axisResult(rowRoot, rowChain) : null,

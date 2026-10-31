@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregate } from '../src/aggregate.mjs';
-import { layoutPivot } from '../src/pivot-layout.mjs';
+import { aggregate } from '../../src/model/aggregate.mjs';
+import { layoutPivot } from '../../src/model/pivot-layout.mjs';
 
 const rows = [
   { region: 'east', city: 'hangzhou', year: 2023, sales: 10 },
@@ -254,4 +254,19 @@ test('非法层级配置会报错', () => {
       }),
     /环/,
   );
+});
+
+test('每个单元格带二维向量，并提供坐标哈希索引', () => {
+  const result = layout();
+
+  for (const cell of result.cells) {
+    assert.deepEqual(cell.vector, [cell.x, cell.y]);
+    assert.equal(result.cellMap.get(`${cell.x},${cell.y}`), cell);
+  }
+  assert.equal(result.cellMap.size, result.cells.length);
+
+  assert.equal(result.points.length, rows.length);
+  for (const point of result.points) {
+    assert.deepEqual(point.vector, [point.x, point.y]);
+  }
 });
