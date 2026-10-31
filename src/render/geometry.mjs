@@ -185,18 +185,29 @@ function numberOption(value, fallback, { name, allowZero = true }) {
   return value;
 }
 
+function finiteNumberOption(value, fallback, name) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} 必须是有限数值`);
+  }
+  return value;
+}
+
 function normalizeViewport(raw, contentSize) {
   const width = numberOption(raw?.width, contentSize.width, { name: 'viewport.width' });
   const height = numberOption(raw?.height, contentSize.height, { name: 'viewport.height' });
   const maxScrollX = Math.max(0, contentSize.width - width);
   const maxScrollY = Math.max(0, contentSize.height - height);
+
+  // 滚动偏移来自滚轮/拖拽等 UI 输入，越界（包括负数）直接 clamp；
+  // 只有 NaN / Infinity 这种非有限值才视为配置错误。
   const scrollX = clamp(
-    numberOption(raw?.scrollX, 0, { name: 'viewport.scrollX' }),
+    finiteNumberOption(raw?.scrollX, 0, 'viewport.scrollX'),
     0,
     maxScrollX,
   );
   const scrollY = clamp(
-    numberOption(raw?.scrollY, 0, { name: 'viewport.scrollY' }),
+    finiteNumberOption(raw?.scrollY, 0, 'viewport.scrollY'),
     0,
     maxScrollY,
   );

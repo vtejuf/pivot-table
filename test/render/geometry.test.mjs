@@ -89,7 +89,7 @@ test('滚动时数据区平移，表头冻结在视口边缘', () => {
   assert.equal(geometry.rowHeaderRect(0, 0, 3).x, 0);
 });
 
-test('滚动偏移被限制在内容范围内，负偏移显式报错', () => {
+test('滚动偏移被限制在内容范围内，负偏移归零', () => {
   const geometry = computePivotGeometry(makeLayout(), {
     viewport: { width: 200, height: 100, scrollX: 9999 },
   });
@@ -97,12 +97,18 @@ test('滚动偏移被限制在内容范围内，负偏移显式报错', () => {
   assert.equal(geometry.viewport.maxScrollX, 168);
   assert.equal(geometry.viewport.scrollX, 168);
 
+  const negative = computePivotGeometry(makeLayout(), {
+    viewport: { width: 200, height: 100, scrollX: -20, scrollY: -40 },
+  });
+  assert.equal(negative.viewport.scrollX, 0);
+  assert.equal(negative.viewport.scrollY, 0);
+
   assert.throws(
     () =>
       computePivotGeometry(makeLayout(), {
-        viewport: { width: 200, height: 100, scrollY: -1 },
+        viewport: { width: 200, height: 100, scrollY: Number.NaN },
       }),
-    /非负/,
+    /有限数值/,
   );
 });
 

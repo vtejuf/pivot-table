@@ -124,6 +124,17 @@ test('viewport 裁剪：只绘制可见单元格和表头', () => {
   assert.ok(!texts.includes('40'));
 });
 
+test('负滚动偏移被 clamp 到 0，不会抛错', () => {
+  const { ctx } = createFakeContext();
+  const { geometry, stats } = renderPivot(ctx, makeLayout(), {
+    viewport: { width: 368, height: 196, scrollX: -20, scrollY: -40 },
+  });
+
+  assert.equal(geometry.viewport.scrollX, 0);
+  assert.equal(geometry.viewport.scrollY, 0);
+  assert.equal(stats.drawnValues, 4);
+});
+
 test('大网格只绘制视口内的格子', () => {
   const bigDimensions = [
     { key: 'r', axis: 'row' },
