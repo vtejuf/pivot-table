@@ -12,8 +12,8 @@
  *   [data-demo-zoom]     列宽显示
  *   [data-demo-grid-size] / [data-demo-stats] / [data-demo-matrix] 状态文本
  *
- * 并列度量只负责布局数据：度量作为列轴最末层维度。双度量模式下先关闭
- * 热力图；双度量热力是后续独立的 feature。
+ * 并列度量只负责布局数据：度量作为列轴最末层维度。热力图由 feature 通过
+ * cellStyle 提供；双度量时按 measure 分别计算色阶。
  *
  * 后续扩展点（小计/总计、折叠/展开）：
  * - 在 rebuildLayout() 里对聚合行做附加处理，再交给 layoutPivot；
@@ -24,6 +24,7 @@
 import { layoutPivot } from '../src/model/index.mjs';
 import { renderPivot } from '../src/render/index.mjs';
 import { combineMeasures } from '../src/features/dual-measure.mjs';
+import { createHeatmapStyle } from '../src/features/heatmap.mjs';
 import { salesCube, countCube } from '../examples/sample-data.mjs';
 
 const DEFAULT_CELL_WIDTH = 104;
@@ -77,7 +78,7 @@ export function createPivotDemo(root = document, options = {}) {
   let scrollX = 0;
   let scrollY = 0;
   let lastGeometry = null;
-  let heatmapBeforeDual = heatmapInput?.checked ?? true;
+  let heatmapStyle = null;
   const cleanups = [];
 
   const listen = (target, type, handler, listenerOptions) => {
@@ -92,17 +93,6 @@ export function createPivotDemo(root = document, options = {}) {
 
   function syncDualControls(dual) {
     if (measureSelect) measureSelect.disabled = dual;
-    if (!heatmapInput) return;
-
-    if (dual) {
-      heatmapBeforeDual = heatmapInput.checked;
-      heatmapInput.checked = false;
-      heatmapInput.title = '并列度量模式暂不支持热力图';
-    } else {
-      heatmapInput.checked = heatmapBeforeDual;
-      heatmapInput.title = '';
-    }
-    heatmapInput.disabled = dual;
   }
 
   function rebuildLayout(resetScroll = true) {
@@ -113,11 +103,20 @@ export function createPivotDemo(root = document, options = {}) {
       value: dual ? cube.value : cube.measure.key,
       mode: modeSelect?.value ?? 'compact',
     });
+    heatmapStyle = null;
     if (resetScroll) {
       scrollX = 0;
       scrollY = 0;
     }
     render();
+  }
+
+  function getHeatmapCellStyle() {
+    if (heatmapInput && !heatmapInput.checked) return undefined;
+    if (!heatmapStyle) {
+      heatmapStyle = createHeatmapStyle(layout, { measureKey: 'measure' });
+    }
+    return heatmapStyle.cellStyle;
   }
 
   function render() {
@@ -133,8 +132,9 @@ export function createPivotDemo(root = document, options = {}) {
       },
       cellSize: { width: cellWidth, height: 28 },
       headerSize: { row: Math.max(68, Math.round(cellWidth * 0.86)), col: 28 },
-      // 并列度量只处理布局；双度量热力是后续独立 feature。
-      heatmap: isDual() ? false : heatmapInput ? heatmapInput.checked : true,
+      // 热力图由 feature 通过 cellStyle 提供；核心旧 heatmap 选项暂不使用。
+      heatmap: false,
+      cellStyle: getHeatmapCellStyle(),
       formatValue: (value) =>
         typeof value === 'number' ? value.toLocaleString('zh-CN') : String(value),
     });

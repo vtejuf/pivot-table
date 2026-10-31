@@ -29,6 +29,7 @@ src/
     theme.mjs          默认主题与颜色工具
   features/
     dual-measure.mjs   并列度量：度量作为最末列维度（附加功能）
+    heatmap.mjs        热力图：通过 cellStyle 渲染，按 measure 分组色阶
 site/
   main.mjs             主页导航与 Demo 初始化
   demo.mjs             主页 / 示例共用的 Demo 控制器
@@ -38,6 +39,7 @@ test/
   render/              几何、绘制、主题测试
   features/
     dual-measure.test.mjs  并列度量测试
+    heatmap.test.mjs       热力图测试
   architecture.test.mjs    核心不反向依赖 features
 examples/
   demo.mjs             终端输出布局结果
@@ -56,6 +58,7 @@ bench/
 docs/
   matrix-transform.md  矩阵推导与 cartesian/compact 差异
   rendering.md         Canvas 渲染管线与性能方案
+  features-architecture.md  附加功能架构与边界
 ```
 
 ## 快速开始
@@ -183,12 +186,16 @@ y  =  [   3       1      0     0 ] · v
 
 ```js
 import { renderPivot } from './src/render/index.mjs';
+import { createHeatmapStyle } from './src/features/heatmap.mjs';
+
+const heatmap = createHeatmapStyle(result);
 
 const { geometry, stats } = renderPivot(canvas, result, {
   viewport: { width: 960, height: 560, scrollX: 0, scrollY: 0 },
   cellSize: { width: 104, height: 28 },
   headerSize: { row: 88, col: 28 },
-  heatmap: true,
+  heatmap: false, // 由 feature 的 cellStyle 负责
+  cellStyle: heatmap.cellStyle,
   formatValue: (value) => value.toLocaleString('zh-CN'),
 });
 // geometry.visible: { x0, x1, y0, y1 }
@@ -200,8 +207,9 @@ const { geometry, stats } = renderPivot(canvas, result, {
 - 多层行 / 列表头，滚动时冻结在视口边缘；
 - 视口虚拟化，只遍历并绘制可见单元格，网格线批量描边；
 - **并列度量**：feature 层把度量作为列轴最末维度，Demo 工具栏可开关；
-  双度量模式只处理布局，不启用热力图；
-- 数值色阶（热力图）与自动对比文字颜色；
+- **热力图 feature**：通过 `cellStyle` 渲染；单度量共用一个范围，双度量按
+  `measure` 分别计算 min/max 和色阶，互不干扰；
+- 核心旧 `heatmap` 选项暂留兼容，Demo 已切换到 feature；稳定后单独移除；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；
 - 传入 canvas 时按 DPR 设置物理像素，也可直接传 2D context；
 - 返回 `geometry` 与 `stats`，便于命中测试和性能观测。

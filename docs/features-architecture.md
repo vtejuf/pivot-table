@@ -1,8 +1,8 @@
 # 附加功能架构设计（设计稿）
 
-- **状态**：设计稿；并列度量已作为第一个 feature 实现，小计 / 总计、折叠 / 展开等仍未实现。
+- **状态**：设计稿；并列度量、热力图 feature 已实现；核心旧热力图暂留，稳定后移除；小计 / 总计、折叠 / 展开仍未实现。
 - **日期**：2026-10-31
-- **范围**：并列度量、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
+- **范围**：并列度量、热力图、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
 - **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
 
 ## 1. 目标
@@ -39,7 +39,7 @@
 
 ## 3. 目录规划
 
-第一个 feature（并列度量）已落地；其余目录在对应功能实现时再创建：
+第一个 feature（并列度量）和热力图 feature 已落地；其余目录在对应功能实现时再创建：
 
 ```
 src/
@@ -47,12 +47,14 @@ src/
   render/        核心：几何、Canvas、主题（冻结）
   features/      附加业务能力
     dual-measure.mjs  已实现：并列度量布局
+    heatmap.mjs       已实现：热力图渲染
     index.mjs         可选：feature 统一入口（尚未创建）
     subtotals.mjs     规划中
     collapse.mjs      规划中
 test/
   features/
     dual-measure.test.mjs  已实现
+    heatmap.test.mjs       已实现
     subtotals.test.mjs     规划中
     collapse.test.mjs      规划中
   architecture.test.mjs    已实现：依赖方向守卫
@@ -68,9 +70,21 @@ test/
 - 输入：`dimensions` + `measures: [{ label, rows, valueField }]`；
 - 输出：长表 `rows`、追加 measure 维度的 `dimensions`、`value` 字段名；
 - 核心矩阵、表头、`cellMap` 与渲染器均未修改；
-- 双度量模式只处理布局，热力图关闭；双度量热力是后续独立 feature；
-  现有核心热力图本次不迁移，热力图 feature 化是另一个独立任务；
+- 并列度量本身只处理布局；热力图由独立 feature 按 measure 分别计算；
+- 核心旧热力图暂留兼容，待 feature 稳定后移除；
 - 架构守卫测试确保 `src/model` / `src/render` 不反向依赖 `features`。
+
+## 3.2 已实现：热力图 feature
+
+`src/features/heatmap.mjs` 通过核心已有的 `cellStyle` 回调渲染，不修改核心
+renderer 的绘制路径。
+
+- 单度量布局：所有数值共用一个 min/max；
+- 并列度量布局：按 `measure` 维度分别计算 min/max 和色阶，互不干扰；
+- 空值 / 非数值单元格返回 `undefined`，交回核心默认样式；
+- Demo 传 `heatmap: false` 并改用 feature 的 `cellStyle`；
+- 核心旧 `heatmap` 选项与测试暂留兼容，等 feature 稳定后单独移除；
+- 稳定判据：feature 测试通过、Demo 单/双度量与热力开关验证通过、站点不再调用核心 `heatmap`；满足后单独提交移除核心选项、色板与测试。
 
 ## 4. 依赖规则
 
@@ -165,10 +179,10 @@ site / examples / bench
 
 本次设计不包含：
 
-- 创建 `src/features/` 或 `test/features/` 空目录；
+- 预先创建无实现内容的目录；
 - 实现小计 / 总计；
 - 实现折叠 / 展开；
-- 迁移或扩展热力图；
+- 移除核心旧热力图（等 feature 稳定后单独做）；
 - 修改核心 `aggregate` / `layoutPivot` / `renderPivot`；
 - 引入插件注册器、事件总线或新的运行时依赖。
 
@@ -180,6 +194,7 @@ site / examples / bench
 4. 实现并测试折叠 / 展开 feature。
 5. 在 `site/` 接入控件与状态，复用共享 demo 控制器。
 6. 补充文档和架构守卫测试。
+7. 热力图 feature 稳定后，移除核心旧 `heatmap` 选项、主题色板与相关测试。
 
 ## 10. 评审清单
 
