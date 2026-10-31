@@ -41,7 +41,6 @@ Canvas、SVG 或 DOM 表格。
     headerCells,   // 绘制的表头块数
     gridLines,     // 网格线数
     visible,       // { x0, x1, y0, y1 }
-    heatmap,       // { min, max } 或 null
   },
 }
 ```
@@ -90,8 +89,8 @@ x1 = ceil((scrollX + 数据视口宽) / cellW) − 1
 - **一次 DPR 变换**：`setupCanvas()` 只设置一次 backing store 尺寸和
   `setTransform(dpr, ...)`，绘制代码始终使用 CSS 像素。尺寸不变时不会重复
   给 `canvas.width / height` 赋值，避免滚动重绘时重新分配缓冲区。
-- **热力范围缓存**：数值 min/max 以 layout 对象为键缓存在 `WeakMap` 中，
-  滚动时不重复扫描全部单元格。layout 视为不可变；修改数据后应重新布局。
+- **样式回调由 feature 提供**：热力图等视觉编码通过 `cellStyle` 在 feature
+  层计算颜色，核心只负责应用背景色和文字颜色；
 - **不测量文本**：默认按格子裁剪文本，不做逐格 `measureText()` 或自动
   换行；需要省略号或自动列宽时应由上层预先计算。
 
@@ -152,8 +151,8 @@ const cell = layout.cellMap.get(`${x},${y}`);
 
 Canvas 内容对辅助技术不可见。生产环境建议同时提供语义化表格（可以视觉
 隐藏）或 `aria-label` 摘要，并维护键盘焦点与 active cell。当前渲染器只做
-了两件事：文本裁剪和数值色阶的对比色选择；没有做省略号、换行、自动列宽
-和打印分辨率适配。
+文本裁剪；数值色阶及对比文字颜色由热力图 feature 提供，核心不感知颜色
+编码。
 
 ## 当前限制
 
@@ -167,7 +166,8 @@ Canvas 内容对辅助技术不可见。生产环境建议同时提供语义化�
 ## 验证
 
 ```bash
-node --test test/model/*.test.mjs test/render/*.test.mjs
+node --test test/model/*.test.mjs test/render/*.test.mjs \
+  test/features/*.test.mjs test/architecture.test.mjs
 ```
 
 渲染测试使用一个记录调用的 fake 2D context，覆盖：
@@ -175,6 +175,8 @@ node --test test/model/*.test.mjs test/render/*.test.mjs
 - 数据格、表头、网格线的绘制数量；
 - 视口裁剪后的 `drawnCells` 与文本；
 - 150 × 150 大网格只绘制可见格；
-- 热力图颜色与浅色/深色文字切换；
 - 自定义 `formatValue` / `cellStyle`；
 - 传 canvas 时按 DPR 设置物理尺寸。
+
+热力图颜色、浅色/深色文字和双度量分范围由 `test/features/heatmap.test.mjs`
+覆盖。

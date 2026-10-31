@@ -1,7 +1,8 @@
 /**
  * 可视化模块：默认主题与颜色工具。
  *
- * 主题只描述样式，不参与布局计算。颜色统一使用 #rrggbb，方便做热力插值。
+ * 主题只描述样式，不参与布局计算。颜色工具供 feature（如热力图）做
+ * 颜色插值和文字对比度计算。
  */
 
 export const DEFAULT_THEME = Object.freeze({
@@ -19,12 +20,11 @@ export const DEFAULT_THEME = Object.freeze({
   headerFont: '600 12px ui-sans-serif, system-ui, sans-serif',
   valueFont: '12px ui-sans-serif, system-ui, sans-serif',
   padding: 8,
-  heatmap: Object.freeze({
-    from: '#eff6ff',
-    to: '#1d4ed8',
-    darkText: '#0f172a',
-    lightText: '#ffffff',
-  }),
+});
+
+const DEFAULT_TEXT_COLORS = Object.freeze({
+  darkText: '#0f172a',
+  lightText: '#ffffff',
 });
 
 /** 把 #rgb / #rrggbb / rgb(r, g, b) 解析成 [r, g, b]。 */
@@ -62,9 +62,9 @@ export function mixHex(from, to, t) {
 }
 
 /**
- * 根据背景色亮度选择深色或浅色文字，保证热力格上的可读性。
+ * 根据背景色亮度选择深色或浅色文字，保证彩色背景上的可读性。
  */
-export function readableTextColor(background, theme = DEFAULT_THEME.heatmap) {
+export function readableTextColor(background, theme = DEFAULT_TEXT_COLORS) {
   const [r, g, b] = parseHex(background);
   const toLinear = (channel) => {
     const v = channel / 255;

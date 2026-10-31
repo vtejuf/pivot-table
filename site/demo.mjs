@@ -132,8 +132,6 @@ export function createPivotDemo(root = document, options = {}) {
       },
       cellSize: { width: cellWidth, height: 28 },
       headerSize: { row: Math.max(68, Math.round(cellWidth * 0.86)), col: 28 },
-      // 热力图由 feature 通过 cellStyle 提供；核心旧 heatmap 选项暂不使用。
-      heatmap: false,
       cellStyle: getHeatmapCellStyle(),
       formatValue: (value) =>
         typeof value === 'number' ? value.toLocaleString('zh-CN') : String(value),

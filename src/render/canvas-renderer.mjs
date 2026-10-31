@@ -8,7 +8,7 @@
  *
  *     renderPivot(canvas, layout, {
  *       viewport: { width, height, scrollX, scrollY },
- *       heatmap: true,
+ *       cellStyle: (cell) => ({ background, text }),
  *     });
  *
  * 也可以直接传 CanvasRenderingContext2D（此时视口由 viewport 决定，不做
@@ -16,7 +16,7 @@
  */
 
 import { computePivotGeometry, rectsIntersect } from './geometry.mjs';
-import { DEFAULT_THEME, mixHex, readableTextColor } from './theme.mjs';
+import { DEFAULT_THEME } from './theme.mjs';
 
 /**
  * 在 canvas 上绘制透视表。
@@ -30,9 +30,6 @@ import { DEFAULT_THEME, mixHex, readableTextColor } from './theme.mjs';
  *   overscan?: number,
  *   dpr?: number,
  *   theme?: Partial<typeof DEFAULT_THEME>,
- *   heatmap?: boolean | {
- *     enabled?: boolean, min?: number, max?: number, from?: string, to?: string
- *   },
  *   formatValue?: (value: unknown, cell: object) => string | null | undefined,
  *   cellStyle?: (cell: object | null, context: object) =>
  *     { background?: string, text?: string } | undefined
@@ -42,8 +39,7 @@ import { DEFAULT_THEME, mixHex, readableTextColor } from './theme.mjs';
  *   stats: {
  *     cellsInGrid: number, drawnCells: number, drawnValues: number,
  *     textDraws: number, headerCells: number, gridLines: number,
- *     visible: { x0: number, x1: number, y0: number, y1: number },
- *     heatmap: { min: number, max: number } | null
+ *     visible: { x0: number, x1: number, y0: number, y1: number }
  *   }
  * }}
  */
@@ -83,7 +79,6 @@ export function renderPivot(target, layout, options = {}) {
   }
 
   const geometry = computePivotGeometry(layout, { ...options, viewport });
-  const heat = resolveHeatScale(layout, options.heatmap, theme);
   const cellMap =
     layout.cellMap instanceof Map
       ? layout.cellMap
@@ -97,10 +92,9 @@ export function renderPivot(target, layout, options = {}) {
     headerCells: 0,
     gridLines: 0,
     visible: { ...geometry.visible },
-    heatmap: heat ? { min: heat.min, max: heat.max } : null,
   };
 
-  paint(ctx, layout, geometry, theme, options, cellMap, heat, stats);
+  paint(ctx, layout, geometry, theme, options, cellMap, stats);
   return { geometry, stats };
 }
 
@@ -133,7 +127,7 @@ export function setupCanvas(canvas, width, height, dpr = 1) {
 // 绘制
 // ---------------------------------------------------------------------------
 
-function paint(ctx, layout, geometry, theme, options, cellMap, heat, stats) {
+function paint(ctx, layout, geometry, theme, options, cellMap, stats) {
   const viewport = geometry.viewport;
 
   ctx.save();
@@ -148,7 +142,6 @@ function paint(ctx, layout, geometry, theme, options, cellMap, heat, stats) {
     theme,
     options,
     cellMap,
-    heat,
     stats,
   );
   paintGridLines(ctx, geometry, theme, stats);
@@ -167,7 +160,6 @@ function paintCellBackgrounds(
   theme,
   options,
   cellMap,
-  heat,
   stats,
 ) {
   const { x0, x1, y0, y1 } = geometry.visible;
@@ -190,11 +182,6 @@ function paintCellBackgrounds(
           : theme.stripeBackground
         : theme.emptyBackground;
 
-      let heatBackground = null;
-      if (heat && hasValue && typeof cell.value === 'number' && Number.isFinite(cell.value)) {
-        heatBackground = heat.color(cell.value);
-        background = heatBackground;
-      }
       if (custom?.background) background = custom.background;
 
       if (background) {
@@ -209,9 +196,7 @@ function paintCellBackgrounds(
           ? options.formatValue(cell.value, cell)
           : String(cell.value);
         if (raw !== null && raw !== undefined && String(raw) !== '') {
-          let color = theme.text;
-          if (heatBackground) color = readableTextColor(heatBackground, theme.heatmap);
-          if (custom?.text) color = custom.text;
+          const color = custom?.text ?? theme.text;
           entries.push({ rect, text: String(raw), color });
         }
       }
@@ -411,68 +396,10 @@ function paintSeparators(ctx, geometry, theme) {
 // 辅助
 // ---------------------------------------------------------------------------
 
-function resolveHeatScale(layout, option, theme) {
-  if (option === undefined || option === null || option === false) return null;
-  if (typeof option !== 'boolean' && (typeof option !== 'object' || Array.isArray(option))) {
-    throw new Error('heatmap 必须是布尔值或配置对象');
-  }
-
-  const config = option === true ? {} : option;
-  if (config.enabled === false) return null;
-
-  const fixedMin = Number.isFinite(config.min);
-  const fixedMax = Number.isFinite(config.max);
-  const range = fixedMin && fixedMax ? null : scanValueRange(layout);
-  const min = fixedMin ? config.min : range.min;
-  const max = fixedMax ? config.max : range.max;
-
-  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
-
-  const from = config.from ?? theme.heatmap.from;
-  const to = config.to ?? theme.heatmap.to;
-
-  return {
-    min,
-    max,
-    color(value) {
-      const t = max === min ? 0.5 : (value - min) / (max - min);
-      return mixHex(from, to, t);
-    },
-  };
-}
-
-/**
- * 数值范围按 layout 对象缓存。layoutPivot() 的返回值视为不可变；修改
- * cell.value 后请重新布局，否则热力色阶可能沿用旧范围。
- */
-const valueRangeCache = new WeakMap();
-
-function scanValueRange(layout) {
-  const cached = valueRangeCache.get(layout);
-  if (cached) return cached;
-
-  let min = Infinity;
-  let max = -Infinity;
-  for (const cell of layout.cells ?? []) {
-    const value = cell.value;
-    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
-    if (value < min) min = value;
-    if (value > max) max = value;
-  }
-
-  const range = { min, max };
-  valueRangeCache.set(layout, range);
-  return range;
-}
-
 function mergeTheme(overrides = {}) {
   return {
     ...DEFAULT_THEME,
     ...overrides,
-    heatmap: {
-      ...DEFAULT_THEME.heatmap,
-      ...(overrides.heatmap ?? {}),
-    },
   };
 }
 

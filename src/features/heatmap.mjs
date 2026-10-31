@@ -6,7 +6,7 @@
  * - 空值 / 非数值单元格返回 undefined，交回核心默认样式；
  * - 颜色只写进 cell.background / cell.text，由核心 renderPivot 应用。
  *
- * 核心旧的 heatmap 选项暂留作兼容；Demo 已切换到本 feature。
+ * 核心已不再包含 heatmap 选项；色阶逻辑全部在本 feature。
  */
 
 import { mixHex, readableTextColor } from '../render/theme.mjs';

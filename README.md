@@ -194,7 +194,6 @@ const { geometry, stats } = renderPivot(canvas, result, {
   viewport: { width: 960, height: 560, scrollX: 0, scrollY: 0 },
   cellSize: { width: 104, height: 28 },
   headerSize: { row: 88, col: 28 },
-  heatmap: false, // 由 feature 的 cellStyle 负责
   cellStyle: heatmap.cellStyle,
   formatValue: (value) => value.toLocaleString('zh-CN'),
 });
@@ -209,7 +208,7 @@ const { geometry, stats } = renderPivot(canvas, result, {
 - **并列度量**：feature 层把度量作为列轴最末维度，Demo 工具栏可开关；
 - **热力图 feature**：通过 `cellStyle` 渲染；单度量共用一个范围，双度量按
   `measure` 分别计算 min/max 和色阶，互不干扰；
-- 核心旧 `heatmap` 选项暂留兼容，Demo 已切换到 feature；稳定后单独移除；
+- 核心渲染器只保留 `cellStyle` / `formatValue` 接缝，不再包含热力图逻辑；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；
 - 传入 canvas 时按 DPR 设置物理像素，也可直接传 2D context；
 - 返回 `geometry` 与 `stats`，便于命中测试和性能观测。

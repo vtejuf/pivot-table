@@ -1,6 +1,6 @@
 # 附加功能架构设计（设计稿）
 
-- **状态**：设计稿；并列度量、热力图 feature 已实现；核心旧热力图暂留，稳定后移除；小计 / 总计、折叠 / 展开仍未实现。
+- **状态**：设计稿；并列度量、热力图 feature 已实现，核心旧热力图已移除；小计 / 总计、折叠 / 展开仍未实现。
 - **日期**：2026-10-31
 - **范围**：并列度量、热力图、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
 - **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
@@ -29,6 +29,10 @@
 - `src/render/theme.mjs`
 
 核心入口 `src/model/index.mjs`、`src/render/index.mjs` 不感知附加功能。
+
+> 例外：2026-10-31 经明确同意，移除核心 `heatmap` 选项、主题色板与相关测试，
+> 热力图完全迁入 `src/features/heatmap.mjs`。核心矩阵/几何与其余渲染行为不变，
+> 后续继续按冻结规则执行。
 
 ### 2.2 允许的变更
 
@@ -71,7 +75,7 @@ test/
 - 输出：长表 `rows`、追加 measure 维度的 `dimensions`、`value` 字段名；
 - 核心矩阵、表头、`cellMap` 与渲染器均未修改；
 - 并列度量本身只处理布局；热力图由独立 feature 按 measure 分别计算；
-- 核心旧热力图暂留兼容，待 feature 稳定后移除；
+- 核心旧热力图已移除，热力图逻辑全部在 `src/features/heatmap.mjs`；
 - 架构守卫测试确保 `src/model` / `src/render` 不反向依赖 `features`。
 
 ## 3.2 已实现：热力图 feature
@@ -82,9 +86,8 @@ renderer 的绘制路径。
 - 单度量布局：所有数值共用一个 min/max；
 - 并列度量布局：按 `measure` 维度分别计算 min/max 和色阶，互不干扰；
 - 空值 / 非数值单元格返回 `undefined`，交回核心默认样式；
-- Demo 传 `heatmap: false` 并改用 feature 的 `cellStyle`；
-- 核心旧 `heatmap` 选项与测试暂留兼容，等 feature 稳定后单独移除；
-- 稳定判据：feature 测试通过、Demo 单/双度量与热力开关验证通过、站点不再调用核心 `heatmap`；满足后单独提交移除核心选项、色板与测试。
+- Demo 通过 `cellStyle` 使用 feature；核心 renderer 不再包含热力图选项；
+- 核心只保留 `cellStyle` / `formatValue` 这类通用扩展点。
 
 ## 4. 依赖规则
 
@@ -182,8 +185,7 @@ site / examples / bench
 - 预先创建无实现内容的目录；
 - 实现小计 / 总计；
 - 实现折叠 / 展开；
-- 移除核心旧热力图（等 feature 稳定后单独做）；
-- 修改核心 `aggregate` / `layoutPivot` / `renderPivot`；
+- 修改核心矩阵/几何算法或默认渲染行为（已完成的 heatmap 迁出除外）；
 - 引入插件注册器、事件总线或新的运行时依赖。
 
 ## 9. 未来落地顺序
@@ -194,7 +196,6 @@ site / examples / bench
 4. 实现并测试折叠 / 展开 feature。
 5. 在 `site/` 接入控件与状态，复用共享 demo 控制器。
 6. 补充文档和架构守卫测试。
-7. 热力图 feature 稳定后，移除核心旧 `heatmap` 选项、主题色板与相关测试。
 
 ## 10. 评审清单
 

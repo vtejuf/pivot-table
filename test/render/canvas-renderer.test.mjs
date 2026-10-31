@@ -166,26 +166,6 @@ test('大网格只绘制视口内的格子', () => {
   assert.ok(fillTexts(calls).length <= 50 + 15);
 });
 
-test('热力图按数值范围着色，深色背景自动切换浅色文字', () => {
-  const { ctx, calls } = createFakeContext();
-  const { stats } = renderPivot(ctx, makeLayout(), { heatmap: true });
-
-  assert.deepEqual(stats.heatmap, { min: 10, max: 40 });
-
-  const firstCellFill = calls.find(
-    (call) =>
-      call.op === 'fillRect' &&
-      call.args[0] === 176 &&
-      call.args[1] === 28 &&
-      call.args[2] === 96 &&
-      call.args[3] === 28,
-  );
-  assert.equal(firstCellFill.fillStyle, 'rgb(239, 246, 255)'); // 最小值 → from
-
-  const maxText = fillTexts(calls).find((call) => call.args[0] === '40');
-  assert.equal(maxText.fillStyle, '#ffffff');
-});
-
 test('formatValue 与 cellStyle 可定制显示', () => {
   const { ctx, calls } = createFakeContext();
   renderPivot(ctx, makeLayout(), {

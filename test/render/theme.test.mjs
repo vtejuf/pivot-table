@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_THEME,
   mixHex,
   parseHex,
   readableTextColor,
@@ -22,6 +21,6 @@ test('mixHex 线性插值并裁剪 t', () => {
 });
 
 test('readableTextColor 按亮度选深色或浅色文字', () => {
-  assert.equal(readableTextColor('#ffffff'), DEFAULT_THEME.heatmap.darkText);
-  assert.equal(readableTextColor('#1d4ed8'), DEFAULT_THEME.heatmap.lightText);
+  assert.equal(readableTextColor('#ffffff'), '#0f172a');
+  assert.equal(readableTextColor('#1d4ed8'), '#ffffff');
 });
