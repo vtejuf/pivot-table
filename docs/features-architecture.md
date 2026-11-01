@@ -1,6 +1,6 @@
 # 附加功能架构设计（设计稿）
 
-- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例已实现，核心旧热力图已移除；小计 / 总计、折叠 / 展开仍未实现。
+- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、行小计/行总计（行轴 P1）已实现，核心旧热力图已移除；列小计、双轴交叉、折叠 / 展开仍未实现。
 - **日期**：2026-10-31
 - **范围**：并列度量、热力图、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
 - **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
@@ -53,6 +53,7 @@ src/
     dual-measure.mjs  已实现：并列度量布局
     heatmap.mjs       已实现：热力图渲染
     overlay.mjs       已实现：自定义叠加渲染（角区示例）
+    totals.mjs        已实现：行小计/行总计（行轴 P1）
     index.mjs         可选：feature 统一入口（尚未创建）
     subtotals.mjs     规划中
     collapse.mjs      规划中
@@ -103,6 +104,23 @@ renderer 的绘制路径。
 - feature 只读取 `layout` / `geometry`，不修改核心对象；
 - Demo 通过 `[data-demo-overlay]` 开关接入，关闭时仍走核心 `renderPivot`。
 
+## 3.4 已实现：行小计 / 行总计（行轴 P1）
+
+`src/features/totals.mjs` 分两步，核心 `aggregate` / `layoutPivot` /
+`renderPivot` 均不修改：
+
+- `rollupRowTotals(cube, config)`：读取核心聚合结果，按指定行维度上卷，
+  输出独立的 `subtotals` / `grand` 表；不生成布局行，不修改 cube。
+- `withRowTotals(layout, rolled, options)`：路线 B，在基础布局上插入小计 /
+  总计行，重建 `axes.row.header`、`cells`、`cellMap`、`size`；列轴不变，
+  `matrix` 置 `null`。
+- `subtotals: ['region']` 指定维度；叶子维度静默忽略；位置固定末尾。
+- 内置 `sum / count / avg / min / max` 上卷规则；`avg` 用 `__valueCount`
+  加权；可传纯函数 `reduce(records, context)` 覆盖。
+- 开关在 site 层翻译成配置；全关时 `skipped: true`，两层都短路。
+- 首期只支持行轴、单度量；多度量、列小计、双轴交叉、表头样式和折叠联动后续。
+- 设计与边界见 `docs/totals.md`。
+
 ## 4. 依赖规则
 
 ```
@@ -141,6 +159,9 @@ site / examples / bench
 - 分组父子层级下的汇总位置；
 - 汇总单元格的命中测试和渲染装饰；
 - 空数据、单成员、compact 布局等边界。
+
+行轴 P1 已按这个方式落地（见 3.4）：`rollupRowTotals()` 只读 cube 上卷，
+`withRowTotals()` 只读 layout 派生展示布局；上卷规则可配置为纯函数。
 
 ### 5.2 折叠 / 展开
 

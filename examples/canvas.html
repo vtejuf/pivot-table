@@ -240,6 +240,14 @@
             <input id="overlay" type="checkbox" data-demo-overlay checked />
             角区标签
           </label>
+          <label class="check">
+            <input id="row-subtotal" type="checkbox" data-demo-row-subtotal checked />
+            行小计
+          </label>
+          <label class="check">
+            <input id="row-total" type="checkbox" data-demo-row-total checked />
+            行总计
+          </label>
           <label class="range">
             <span>列宽</span>
             <input
@@ -275,7 +283,7 @@
         需要通过 HTTP 打开：<code>python3 -m http.server 8000</code>，然后访问
         <code>http://localhost:8000/examples/canvas.html</code>。滚轮 / 拖拽 /
         方向键平移，表头冻结。并列度量时，热力图按 measure 分别计算范围。
-        角区标签开关演示自定义叠加层。
+        角区标签开关演示自定义叠加层；行小计 / 行总计在 region 维度末尾插入汇总行。
       </p>
     </main>
 

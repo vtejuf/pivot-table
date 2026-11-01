@@ -150,6 +150,14 @@ DPR 已处理）交给 `draw(ctx, { layout, geometry, theme, options })`。核�
 `createCornerLabels()` 只是内置示例：在冻结角区画行/列维度名，角区为空时跳过，
 过窄时省略号截断。实际业务可以直接写自己的 `draw`。
 
+## 行小计 / 行总计布局
+
+`src/features/totals.mjs` 在核心布局之外派生展示布局：`rollupRowTotals()` 先
+按维度上卷，`withRowTotals()` 再插入行小计/总计、重建 `axes.row.header` 和
+`cellMap`。展示布局的 `matrix` 为 `null`，渲染器仍按普通 layout 消费；汇总格
+带 `cell.kind = 'subtotal' | 'total'`，`cellStyle` 可据此区分。设计与边界见
+[totals.md](totals.md)。
+
 ## 交互扩展
 
 命中测试可以直接复用模型：

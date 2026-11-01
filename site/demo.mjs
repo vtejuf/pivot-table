@@ -8,6 +8,8 @@
  *   [data-demo-dual-measure] 并列度量 checkbox
  *   [data-demo-heatmap]  数值色阶 checkbox
  *   [data-demo-overlay]  角区标签开关
+ *   [data-demo-row-subtotal] 行小计 checkbox
+ *   [data-demo-row-total]    行总计 checkbox
  *   [data-demo-width]    列宽 range
  *   [data-demo-reset]    重置滚动按钮
  *   [data-demo-zoom]     列宽显示
@@ -16,9 +18,11 @@
  * 并列度量只负责布局数据：度量作为列轴最末层维度。热力图由 feature 通过
  * cellStyle 提供；双度量时按 measure 分别计算色阶。
  *
- * 后续扩展点（小计/总计、折叠/展开）：
- * - 在 rebuildLayout() 里对聚合行做附加处理，再交给 layoutPivot；
- * - 或扩展 layout 的可见成员集合后再 render。
+ * 行小计/总计由 features/totals.mjs 接入：先 rollupRowTotals() 上卷，再用
+ * withRowTotals() 派生展示布局。并列度量暂不支持行汇总，控件会禁用。
+ *
+ * 后续扩展点（折叠/展开）：
+ * - 在 rebuildLayout() 里对可见成员集合做过滤或上卷，再调用 totals/layout；
  * - 新控件继续用 data-demo-* 暴露，并在 createPivotDemo 内绑定。
  */
 
@@ -30,6 +34,10 @@ import {
 } from '../src/features/overlay.mjs';
 import { combineMeasures } from '../src/features/dual-measure.mjs';
 import { createHeatmapStyle } from '../src/features/heatmap.mjs';
+import {
+  rollupRowTotals,
+  withRowTotals,
+} from '../src/features/totals.mjs';
 import { salesCube, countCube } from '../examples/sample-data.mjs';
 
 const DEFAULT_CELL_WIDTH = 104;
@@ -48,6 +56,8 @@ export function createPivotDemo(root = document, options = {}) {
   const dualInput = scope.querySelector('[data-demo-dual-measure]');
   const heatmapInput = scope.querySelector('[data-demo-heatmap]');
   const overlayInput = scope.querySelector('[data-demo-overlay]');
+  const rowSubtotalInput = scope.querySelector('[data-demo-row-subtotal]');
+  const rowTotalInput = scope.querySelector('[data-demo-row-total]');
   const widthInput = scope.querySelector('[data-demo-width]');
   const resetButton = scope.querySelector('[data-demo-reset]');
   const zoomEl = scope.querySelector('[data-demo-zoom]');
@@ -85,6 +95,8 @@ export function createPivotDemo(root = document, options = {}) {
   let scrollY = 0;
   let lastGeometry = null;
   let heatmapStyle = null;
+  let heatmapCellStyle = null;
+  let totalsActive = false;
   const cornerLabels = createCornerLabels();
   const cleanups = [];
 
@@ -100,17 +112,35 @@ export function createPivotDemo(root = document, options = {}) {
 
   function syncDualControls(dual) {
     if (measureSelect) measureSelect.disabled = dual;
+    if (rowSubtotalInput) rowSubtotalInput.disabled = dual;
+    if (rowTotalInput) rowTotalInput.disabled = dual;
   }
 
   function rebuildLayout(resetScroll = true) {
     const dual = isDual();
     const cube = dual ? dualCube : currentCube();
-    layout = layoutPivot(cube.rows, {
+    const base = layoutPivot(cube.rows, {
       dimensions: cube.dimensions,
       value: dual ? cube.value : cube.measure.key,
       mode: modeSelect?.value ?? 'compact',
     });
+
+    totalsActive = false;
+    if (!dual && (rowSubtotalInput?.checked || rowTotalInput?.checked)) {
+      const rolled = rollupRowTotals(cube, {
+        rows: {
+          subtotals: rowSubtotalInput?.checked ? ['region'] : [],
+          grandTotal: Boolean(rowTotalInput?.checked),
+        },
+      });
+      layout = withRowTotals(base, rolled);
+      totalsActive = !rolled.skipped;
+    } else {
+      layout = base;
+    }
+
     heatmapStyle = null;
+    heatmapCellStyle = null;
     if (resetScroll) {
       scrollX = 0;
       scrollY = 0;
@@ -121,9 +151,16 @@ export function createPivotDemo(root = document, options = {}) {
   function getHeatmapCellStyle() {
     if (heatmapInput && !heatmapInput.checked) return undefined;
     if (!heatmapStyle) {
-      heatmapStyle = createHeatmapStyle(layout, { measureKey: 'measure' });
+      const dataCells = layout.cells.filter((cell) => !cell.kind);
+      const style = createHeatmapStyle(
+        { ...layout, cells: dataCells },
+        { measureKey: 'measure' },
+      );
+      heatmapStyle = style;
+      heatmapCellStyle = (cell) =>
+        cell?.kind ? undefined : style.cellStyle(cell);
     }
-    return heatmapStyle.cellStyle;
+    return heatmapCellStyle;
   }
 
   function render() {
@@ -161,6 +198,7 @@ export function createPivotDemo(root = document, options = {}) {
       gridSizeEl.innerHTML =
         `<strong>${layout.size.rows} 行 × ${layout.size.cols} 列</strong>` +
         ` · ${layout.mode}` +
+        (totalsActive ? ' · 行小计/总计' : '') +
         (isDual() ? ' · 并列度量' : '');
     }
 
@@ -172,9 +210,11 @@ export function createPivotDemo(root = document, options = {}) {
     }
 
     if (matrixEl) {
-      matrixEl.textContent = layout.matrix
-        ? `固定矩阵 ${layout.matrix.length}×${layout.matrix[0].length}`
-        : '分段仿射 · 无全局矩阵';
+      matrixEl.textContent = totalsActive
+        ? '行汇总 · 无全局矩阵'
+        : layout.matrix
+          ? `固定矩阵 ${layout.matrix.length}×${layout.matrix[0].length}`
+          : '分段仿射 · 无全局矩阵';
     }
   }
 
@@ -186,6 +226,8 @@ export function createPivotDemo(root = document, options = {}) {
   });
   listen(heatmapInput, 'change', render);
   listen(overlayInput, 'change', render);
+  listen(rowSubtotalInput, 'change', () => rebuildLayout());
+  listen(rowTotalInput, 'change', () => rebuildLayout());
   listen(widthInput, 'input', render);
   listen(resetButton, 'click', () => {
     scrollX = 0;
