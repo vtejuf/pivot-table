@@ -1,6 +1,6 @@
 # 行 / 列小计与总计（设计稿）
 
-- **状态**：行/列小计、行/列总计与双轴交叉已实现；多度量汇总、真正的跨层
+- **状态**：行/列小计、行/列总计、双轴交叉和多度量分列已实现；真正的跨层
   单格合并、折叠联动后续。
 - **日期**：2026-11-01
 - **原则**：核心 `aggregate` / `layoutPivot` / `renderPivot` 冻结；采用路线 B
@@ -11,15 +11,17 @@
 ```
 明细 rows
   └─ aggregate()                 核心：最细粒度 cube
-      └─ rollupTotals()          feature：按 rows / cols 统一上卷
-          └─ layoutPivot()       核心：基础布局
-              └─ withTotals()     feature：插入行/列汇总并填充交叉格
-                  └─ renderPivot()
+      ├─ rollupTotals()          feature：单度量上卷
+      │   （或 rollupMultiTotals() 多度量按 measure 分列）
+      └─ layoutPivot()           核心：基础布局
+          └─ withTotals()         feature：插入行/列汇总并填充交叉格
+              └─ renderPivot()
 ```
 
-`rollupTotals()` 只读 cube，不读 layout；`withTotals()` 只读 layout 和上卷
-结果，不再做任何聚合。行轴兼容入口 `rollupRowTotals()` / `withRowTotals()`
-仍保留，内部只处理行轴。
+`rollupTotals()` 只读 cube，不读 layout；`rollupMultiTotals()` 对每个度量
+分别调用 `rollupTotals()`，再把度量 label 追加到列路径；`withTotals()` 只读
+layout 和上卷结果，不再做任何聚合。行轴兼容入口 `rollupRowTotals()` /
+`withRowTotals()` 仍保留，内部只处理行轴。
 
 ## 2. 配置
 
@@ -42,6 +44,26 @@ const config = {
 - Demo 的四个开关只是把 DOM 状态翻译成上面的配置；feature 不读取 DOM。
 - 全部关闭时 `rollupTotals()` 直接返回 `skipped: true`，不遍历 cube；
   `withTotals()` 原样返回输入 layout。
+
+多度量入口：
+
+```js
+const rolled = rollupMultiTotals(
+  [
+    { label: '销售额', cube: salesCube },
+    { label: '订单数', cube: countCube },
+  ],
+  {
+    rows: { subtotals: ['region'], grandTotal: true },
+    cols: { subtotals: ['year'], grandTotal: true },
+    measureKey: dualCube.measureKey, // 'measure'
+    valueKey: dualCube.value,        // 'value'
+  },
+);
+```
+
+列小计/总计按 measure 分列，标签例如 `2023 小计 · 销售额`、
+`总计 · 订单数`；不同度量不会相加。行汇总行覆盖所有度量列。
 
 ## 3. 上卷
 
@@ -109,12 +131,18 @@ const reduce = (records, context) => ({
 `records` 是最细粒度的聚合记录，不是原始明细。中位数、去重计数这类不能只靠
 聚合值上卷的规则，不在当前范围；需要明细的规则应在聚合阶段解决。
 
+多度量时，`rollupMultiTotals()` 对每个度量使用各自的 cube 上卷，因此 `avg`
+仍能使用该度量的 `__valueCount`；不要用 `combineMeasures` 的长表做上卷，
+那条路径会丢失 `__count` / `__valueCount`。
+
 ## 4. 布局派生
 
 - 行/列都使用父块内小计：父 member 的 `size` 增加汇总行/列，父标签覆盖它；
   子层显示“小计”。
 - 总计在根层；更深层用空占位 children 链填满，避免露出画布背景。
 - 原始 cells 的 `x / y` 按插入数量平移；汇总 cells 使用槽位的新坐标。
+- 多度量时，列小计的每个 measure 变体是一个独立槽位，父列块 `size` 增加
+  measure 数量；列总计同理。
 - 汇总格分三类：
   - 基础行 × 列小计/总计；
   - 行小计/总计 × 基础列；
@@ -136,25 +164,24 @@ const reduce = (records, context) => ({
 - 列轴为空 / 行轴为空：对应轴的总计跳过，不报错。
 - 对叶子维度配置小计：静默忽略。
 - `compact` / `cartesian` 都支持；展示布局不再依赖固定矩阵。
-- 多度量当前不支持：`combineMeasures` 不保留 `__count` / `__valueCount`，
-  `avg` 上卷会失真；后续在 combine 前按 measure 分别上卷，或保留这两个字段。
+- 多度量通过 `rollupMultiTotals()` 处理；列汇总按 measure 分列，不混加。
+  使用原始分度量 cube，不要使用 `combineMeasures` 的长表做上卷。
 - 真正的单格跨层合并、表头样式、折叠联动均未实现。
 
 ## 6. 测试
 
-- 上卷：行/列小计、总计、双轴交叉值、叶子维度忽略、全关短路、自定义
-  reducer 的 `colDimension` / `rowKind` / `colKind`、avg 加权、min/max、
-  输入记录不被修改。
+- 上卷：行/列小计、总计、双轴交叉值、多度量按 measure 分列、叶子维度忽略、
+  全关短路、自定义 reducer 的 `colDimension` / `rowKind` / `colKind`、avg
+  加权、min/max、输入记录不被修改。
 - 布局：行/列槽位顺序、父块 size 包含汇总、三层行轴占位链、多层小计嵌套、
-  两块表头的 size 不变量、交叉格、纯列透视、`cellMap`、`size`、
-  `matrix = null`、`toPixel()`。
+  多度量列槽按 measure 展开、两块表头的 size 不变量、交叉格、纯列透视、
+  `cellMap`、`size`、`matrix = null`、`toPixel()`。
 - 渲染：fake context 下出现行/列“小计”“总计”文本，绘制格数增加。
 - 站点：DOM 桩确认四个开关组合、双度量禁用和状态文案。
 
 ## 7. 后续
 
-1. 多度量按 measure 分块上卷（保留 `__count` / `__valueCount`）。
-2. 可选的真正跨层表头合并（核心 `depthSpan` 或 overlay）。
-3. 表头样式（overlay 或核心 `headerCellStyle` 扩展）。
-4. 折叠/展开联动：折叠组只显示父行，展开后显示子行 + 小计；汇总始终从基础
+1. 可选的真正跨层表头合并（核心 `depthSpan` 或 overlay）。
+2. 表头样式（overlay 或核心 `headerCellStyle` 扩展）。
+3. 折叠/展开联动：折叠组只显示父行，展开后显示子行 + 小计；汇总始终从基础
    cells 计算，不重复计入折叠产生的汇总行。

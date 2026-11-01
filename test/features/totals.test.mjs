@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { aggregate, layoutPivot } from '../../src/model/index.mjs';
 import { renderPivot } from '../../src/render/index.mjs';
+import { combineMeasures } from '../../src/features/dual-measure.mjs';
 import {
   pathKey,
+  rollupMultiTotals,
   rollupRowTotals,
   rollupTotals,
   withRowTotals,
@@ -62,6 +64,28 @@ function makeGridBase(cube = makeGridCube()) {
     value: cube.measure.key,
     mode: 'compact',
   });
+}
+
+function makeMultiGrid() {
+  const sumCube = makeGridCube();
+  const countCube = aggregate(gridDetail, { dimensions: gridDimensions });
+  const dual = combineMeasures({
+    dimensions: gridDimensions,
+    measures: [
+      { label: 'sales', rows: sumCube.rows, valueField: sumCube.measure.key },
+      {
+        label: 'count',
+        rows: countCube.rows,
+        valueField: countCube.measure.key,
+      },
+    ],
+  });
+  const base = layoutPivot(dual.rows, {
+    dimensions: dual.dimensions,
+    value: dual.value,
+    mode: 'compact',
+  });
+  return { sumCube, countCube, dual, base };
 }
 
 function createFakeContext() {
@@ -569,6 +593,131 @@ test('withTotals：纯列透视也能插入列汇总', () => {
   assert.equal(display.cellMap.get('2,0').value, 80);
   assert.equal(display.cellMap.get('5,0').value, 100);
   assertHeaderSizes(display.axes.col.header.members, display.size.cols);
+});
+
+test('rollupMultiTotals：列小计/总计按 measure 分列', () => {
+  const { sumCube, countCube } = makeMultiGrid();
+  const rolled = rollupMultiTotals(
+    [
+      { label: 'sales', cube: sumCube },
+      { label: 'count', cube: countCube },
+    ],
+    {
+      rows: { subtotals: ['region'], grandTotal: true },
+      cols: { subtotals: ['year'], grandTotal: true },
+      measureKey: 'measure',
+      valueKey: 'value',
+    },
+  );
+
+  assert.deepEqual(rolled.row.chain, ['region', 'city']);
+  assert.deepEqual(rolled.col.chain, ['year', 'product', 'measure']);
+  assert.deepEqual(rolled.col.dimensions, ['year']);
+  assert.deepEqual(rolled.col.measure.members, ['sales', 'count']);
+  assert.equal(rolled.skipped, false);
+
+  const hangzhou = rolled.cells.get(pathKey(['east', 'hangzhou']));
+  // 基础格 × 基础列仍由 layout.cells 提供，不在汇总表里。
+  assert.equal(hangzhou.get(pathKey([2023, 'phone', 'sales'])), undefined);
+  assert.equal(hangzhou.get(pathKey([2023, 'sales'])).value, 10);
+  assert.equal(hangzhou.get(pathKey([2023, 'count'])).value, 1);
+  assert.equal(hangzhou.get(pathKey(['sales'])).value, 30);
+  assert.equal(hangzhou.get(pathKey(['count'])).value, 2);
+
+  assert.equal(
+    rolled.cells.get(pathKey(['east'])).get(pathKey([2023, 'sales'])).value,
+    40,
+  );
+  assert.equal(
+    rolled.cells.get(pathKey(['east'])).get(pathKey([2023, 'count'])).value,
+    2,
+  );
+  assert.equal(
+    rolled.cells.get(pathKey([])).get(pathKey(['sales'])).value,
+    100,
+  );
+  assert.equal(
+    rolled.cells.get(pathKey([])).get(pathKey(['count'])).value,
+    4,
+  );
+  // 不同度量不能汇总成一个全局值。
+  assert.equal(rolled.cells.get(pathKey([])).get(pathKey([])), undefined);
+});
+
+test('withTotals：多度量列汇总按 measure 分列', () => {
+  const { sumCube, countCube, base } = makeMultiGrid();
+  const rolled = rollupMultiTotals(
+    [
+      { label: 'sales', cube: sumCube },
+      { label: 'count', cube: countCube },
+    ],
+    {
+      rows: { subtotals: ['region'], grandTotal: true },
+      cols: { subtotals: ['year'], grandTotal: true },
+      measureKey: 'measure',
+      valueKey: 'value',
+    },
+  );
+  const display = withTotals(base, rolled);
+
+  assert.equal(base.size.rows, 3);
+  assert.equal(base.size.cols, 6);
+  assert.equal(display.size.rows, 6);
+  assert.equal(display.size.cols, 12);
+
+  assert.deepEqual(
+    display.axes.col.header.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      [2023, 0, 6, null],
+      [2024, 6, 4, null],
+      ['总计 · sales', 10, 1, 'total'],
+      ['总计 · count', 11, 1, 'total'],
+    ],
+  );
+
+  assert.deepEqual(
+    display.axes.col.header.members[0].children.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      ['phone', 0, 2, null],
+      ['laptop', 2, 2, null],
+      ['2023 小计 · sales', 4, 1, 'subtotal'],
+      ['2023 小计 · count', 5, 1, 'subtotal'],
+    ],
+  );
+
+  assert.equal(display.cellMap.get('4,0').value, 10);
+  assert.equal(display.cellMap.get('5,0').value, 1);
+  assert.equal(display.cellMap.get('0,2').value, 10);
+  assert.equal(display.cellMap.get('1,2').value, 1);
+  assert.equal(display.cellMap.get('0,2').members.measure, 'sales');
+  assert.equal(display.cellMap.get('1,2').members.measure, 'count');
+  assert.equal(display.cellMap.get('4,2').value, 40);
+  assert.equal(display.cellMap.get('5,2').value, 2);
+  assert.equal(display.cellMap.get('4,2').members.measure, 'sales');
+  assert.equal(display.cellMap.get('5,2').members.measure, 'count');
+  assert.equal(display.cellMap.get('10,5').value, 100);
+  assert.equal(display.cellMap.get('11,5').value, 4);
+
+  assertHeaderSizes(display.axes.row.header.members, display.size.rows);
+  assertHeaderSizes(display.axes.col.header.members, display.size.cols);
+
+  const { ctx, calls } = createFakeContext();
+  renderPivot(ctx, display);
+  const texts = textValues(calls);
+  assert.ok(texts.includes('2023 小计 · sales'));
+  assert.ok(texts.includes('2023 小计 · count'));
+  assert.ok(texts.includes('总计 · sales'));
+  assert.ok(texts.includes('总计 · count'));
 });
 
 test('withTotals：展示布局可以直接渲染行/列汇总', () => {

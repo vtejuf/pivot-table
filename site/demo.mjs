@@ -20,8 +20,8 @@
  * 并列度量只负责布局数据：度量作为列轴最末层维度。热力图由 feature 通过
  * cellStyle 提供；双度量时按 measure 分别计算色阶。
  *
- * 行/列小计、总计由 features/totals.mjs 接入：先 rollupTotals() 统一上卷，
- * 再用 withTotals() 派生展示布局。并列度量暂不支持汇总，控件会禁用。
+ * 行/列小计、总计由 features/totals.mjs 接入：单度量用 rollupTotals()，
+ * 并列度量用 rollupMultiTotals() 按 measure 分列上卷，再由 withTotals() 派生。
  *
  * 后续扩展点（折叠/展开）：
  * - 在 rebuildLayout() 里对可见成员集合做过滤或上卷，再调用 totals/layout；
@@ -37,6 +37,7 @@ import {
 import { combineMeasures } from '../src/features/dual-measure.mjs';
 import { createHeatmapStyle } from '../src/features/heatmap.mjs';
 import {
+  rollupMultiTotals,
   rollupTotals,
   withTotals,
 } from '../src/features/totals.mjs';
@@ -116,10 +117,6 @@ export function createPivotDemo(root = document, options = {}) {
 
   function syncDualControls(dual) {
     if (measureSelect) measureSelect.disabled = dual;
-    if (rowSubtotalInput) rowSubtotalInput.disabled = dual;
-    if (rowTotalInput) rowTotalInput.disabled = dual;
-    if (colSubtotalInput) colSubtotalInput.disabled = dual;
-    if (colTotalInput) colTotalInput.disabled = dual;
   }
 
   function rebuildLayout(resetScroll = true) {
@@ -148,6 +145,27 @@ export function createPivotDemo(root = document, options = {}) {
           grandTotal: colTotal,
         },
       });
+      layout = withTotals(base, rolled);
+      totalsActive = !rolled.skipped;
+    } else if (dual && (rowSubtotal || rowTotal || colSubtotal || colTotal)) {
+      const rolled = rollupMultiTotals(
+        [
+          { label: '销售额', cube: salesCube },
+          { label: '订单数', cube: countCube },
+        ],
+        {
+          rows: {
+            subtotals: rowSubtotal ? ['region'] : [],
+            grandTotal: rowTotal,
+          },
+          cols: {
+            subtotals: colSubtotal ? ['year'] : [],
+            grandTotal: colTotal,
+          },
+          measureKey: dualCube.measureKey,
+          valueKey: dualCube.value,
+        },
+      );
       layout = withTotals(base, rolled);
       totalsActive = !rolled.skipped;
     } else {

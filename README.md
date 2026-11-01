@@ -33,7 +33,7 @@ src/
     dual-measure.mjs   并列度量：度量作为最末列维度（附加功能）
     heatmap.mjs        热力图：通过 cellStyle 渲染，按 measure 分组色阶
     overlay.mjs        自定义叠加：核心绘制后追加装饰（附角区示例）
-    totals.mjs         行/列小计/总计：统一上卷 + 双轴展示布局
+    totals.mjs         行/列小计/总计：统一上卷 + 双轴展示布局（支持多度量）
 site/
   main.mjs             主页导航与 Demo 初始化
   demo.mjs             主页 / 示例共用的 Demo 控制器
@@ -45,7 +45,7 @@ test/
     dual-measure.test.mjs  并列度量测试
     heatmap.test.mjs       热力图测试
     overlay.test.mjs       自定义叠加与角区示例测试
-    totals.test.mjs        行/列小计/总计测试
+    totals.test.mjs        行/列小计/总计与多度量测试
   architecture.test.mjs    核心不反向依赖 features
 examples/
   demo.mjs             终端输出布局结果
@@ -217,9 +217,9 @@ const { geometry, stats } = renderPivot(canvas, result, {
   `measure` 分别计算 min/max 和色阶，互不干扰；
 - **自定义叠加 feature**：`renderWithOverlay()` 在核心绘制后追加装饰，附角区
   维度名示例；Demo 工具栏可开关，核心几何与绘制顺序不变；
-- **行/列小计/总计 feature**：`rollupTotals()` 统一上卷，`withTotals()`
-  插入行/列、重建表头并填充交叉格；首期支持指定维度、末尾汇总和单度量，
-  核心模型与渲染器不改；
+- **行/列小计/总计 feature**：`rollupTotals()` 统一上卷，多度量用
+  `rollupMultiTotals()` 按 measure 分列；`withTotals()` 插入行/列、重建表头并
+  填充交叉格；支持指定维度、末尾汇总，核心模型与渲染器不改；
 - 核心渲染器只保留 `cellStyle` / `formatValue` 接缝，不再包含热力图逻辑；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；
 - 传入 canvas 时按 DPR 设置物理像素，也可直接传 2D context；
@@ -294,8 +294,8 @@ node bench/depth-run.mjs --heap 1024
 - 左侧菜单：概览、数据流、矩阵算法、Demo、性能方案、快速开始；
 - 右侧内容包含算法推导、可交互 Canvas Demo 和方案对比；
 - Demo 控制器在 `site/demo.mjs`，主页与 `examples/canvas.html` 共用；
-- 控件通过 `data-demo-*` 属性接入，页面上预留了“小计 / 总计”“折叠 / 展开”
-  扩展位。后续可在 `rebuildLayout()` 前处理聚合行，或扩展布局的可见成员集合。
+- 控件通过 `data-demo-*` 属性接入，“行/列小计/总计”已接入；折叠 / 展开
+  仍预留扩展位。
 
 部署到 GitHub Pages：
 

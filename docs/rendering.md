@@ -152,9 +152,9 @@ DPR 已处理）交给 `draw(ctx, { layout, geometry, theme, options })`。核�
 
 ## 行 / 列小计与总计布局
 
-`src/features/totals.mjs` 在核心布局之外派生展示布局：`rollupTotals()` 先
-按行/列维度统一上卷，`withTotals()` 再插入小计/总计、重建两块表头、填充
-交叉格和 `cellMap`。小计挂到父块子层，父标签覆盖汇总行/列；总计的深层用
+`src/features/totals.mjs` 在核心布局之外派生展示布局：`rollupTotals()` /
+`rollupMultiTotals()` 先按行/列维度统一上卷，`withTotals()` 再插入小计/总计、
+重建两块表头、填充交叉格和 `cellMap`。多度量时列汇总按 measure 分列。小计挂到父块子层，父标签覆盖汇总行/列；总计的深层用
 占位链填满。展示布局的 `matrix` 为 `null`，渲染器仍按普通 layout 消费；
 汇总格带 `cell.kind = 'subtotal' | 'total'`，`cellStyle` 可据此区分。
 设计与边界见 [totals.md](totals.md)。

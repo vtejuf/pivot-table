@@ -304,10 +304,158 @@ export function rollupTotals(cube, options = {}) {
 }
 
 /**
+ * 同时上卷多个度量，并按 measure 维度分列。
+ *
+ * 每个度量先按自己的 cube 调用 rollupTotals()，再把列路径追加 measure label，
+ * 合并成统一的汇总立方体。列小计/总计由 withTotals() 按 measure 展开。
+ *
+ * @param {Array<{ label: string, cube: ReturnType<import('../model/aggregate.mjs').aggregate> }>} measures
+ * @param {{
+ *   rows?: { subtotals?: string[], grandTotal?: boolean },
+ *   cols?: { subtotals?: string[], grandTotal?: boolean },
+ *   reduce?: (records: ReadonlyArray<object>, context: object) =>
+ *     { value: unknown, __count?: number, __valueCount?: number },
+ *   measureKey?: string,
+ *   valueKey?: string
+ * }} options
+ * @returns {ReturnType<typeof rollupTotals> & { col: { measure: { key: string, members: string[] } } }}
+ */
+export function rollupMultiTotals(measures, options = {}) {
+  if (!Array.isArray(measures) || measures.length === 0) {
+    throw new TypeError('rollupMultiTotals: measures 至少需要一项');
+  }
+
+  const measureKey = options.measureKey ?? 'measure';
+  const valueKey = options.valueKey ?? 'value';
+  if (typeof measureKey !== 'string' || measureKey === '') {
+    throw new TypeError('rollupMultiTotals: measureKey 必须是非空字符串');
+  }
+  if (typeof valueKey !== 'string' || valueKey === '') {
+    throw new TypeError('rollupMultiTotals: valueKey 必须是非空字符串');
+  }
+
+  const labels = new Set();
+  for (const item of measures) {
+    if (!item || typeof item !== 'object') {
+      throw new TypeError('rollupMultiTotals: 每个度量必须是对象');
+    }
+    if (typeof item.label !== 'string' || item.label === '') {
+      throw new TypeError('rollupMultiTotals: 每个度量必须有非空字符串 label');
+    }
+    if (labels.has(item.label)) {
+      throw new Error(`rollupMultiTotals: 度量 label 重复: ${item.label}`);
+    }
+    labels.add(item.label);
+  }
+
+  const mergedCells = new Map();
+  const rowPaths = new Map();
+  const colPaths = new Map();
+  let rowChain = null;
+  let colChain = null;
+  let rowDimensions = null;
+  let colDimensions = null;
+  let rowIgnored = null;
+  let colIgnored = null;
+  let rowGrand = false;
+  let colGrand = false;
+  let any = false;
+
+  for (const { label, cube } of measures) {
+    const rolled = rollupTotals(cube, {
+      rows: options.rows,
+      cols: options.cols,
+      reduce: options.reduce,
+    });
+
+    if (rowChain === null) {
+      rowChain = rolled.row.chain;
+      colChain = rolled.col.chain;
+      rowDimensions = rolled.row.dimensions;
+      colDimensions = rolled.col.dimensions;
+      rowIgnored = rolled.row.ignored;
+      colIgnored = rolled.col.ignored;
+      rowGrand = rolled.row.grandTotal;
+      colGrand = rolled.col.grandTotal;
+    } else {
+      assertMultiMeasureChain(rolled.row.chain, rowChain, '行');
+      assertMultiMeasureChain(rolled.col.chain, colChain, '列');
+    }
+
+    const colKeyMap = new Map();
+    for (const [oldKey, path] of rolled.col.paths) {
+      const values = [...path.values, label];
+      const key = pathKey(values);
+      colKeyMap.set(oldKey, key);
+      if (!colPaths.has(key)) {
+        colPaths.set(key, {
+          ...path,
+          key,
+          values,
+          path: [...path.path, { key: measureKey, value: label }],
+        });
+      }
+    }
+
+    for (const [key, path] of rolled.row.paths) {
+      if (!rowPaths.has(key)) rowPaths.set(key, path);
+    }
+
+    for (const [rowKey, byCol] of rolled.cells) {
+      let target = mergedCells.get(rowKey);
+      if (!target) {
+        target = new Map();
+        mergedCells.set(rowKey, target);
+      }
+      for (const [oldColKey, result] of byCol) {
+        const newColKey = colKeyMap.get(oldColKey);
+        if (!newColKey) continue;
+        target.set(newColKey, result);
+        any = true;
+      }
+    }
+  }
+
+  return {
+    cells: mergedCells,
+    row: {
+      chain: rowChain ?? [],
+      dimensions: rowDimensions ?? [],
+      ignored: rowIgnored ?? [],
+      grandTotal: rowGrand,
+      paths: rowPaths,
+    },
+    col: {
+      chain: [...(colChain ?? []), measureKey],
+      dimensions: colDimensions ?? [],
+      ignored: colIgnored ?? [],
+      grandTotal: colGrand,
+      paths: colPaths,
+      measure: {
+        key: measureKey,
+        members: measures.map((item) => item.label),
+      },
+    },
+    measure: { key: valueKey, aggregate: 'multi' },
+    skipped: !any,
+  };
+}
+
+function assertMultiMeasureChain(actual, expected, axisName) {
+  if (
+    actual.length !== expected.length ||
+    actual.some((key, index) => key !== expected[index])
+  ) {
+    throw new Error(`rollupMultiTotals: ${axisName}轴链不一致`);
+  }
+}
+
+/**
  * 在基础布局上同时插入行、列小计/总计，返回新的展示布局。
  *
  * 行、列都走父块内小计：父 member 的 size 增加，子层显示“小计”；
- * 总计的深层用占位链填满。交叉格从 rollupTotals() 的统一汇总立方体取值。
+ * 总计的深层用占位链填满。交叉格从 rollupTotals() / rollupMultiTotals()
+ * 的统一汇总立方体取值；多度量时列汇总按 measure 分列。
  *
  * @param {ReturnType<import('../model/pivot-layout.mjs').layoutPivot>} layout
  * @param {ReturnType<typeof rollupTotals>} rolled
@@ -390,7 +538,7 @@ export function withTotals(layout, rolled, options = {}) {
         rolled.row.chain,
         rowSlots,
         slotMap(rowSlots),
-        totalSlotOf(rowSlots),
+        totalSlotsOf(rowSlots),
         mapRow,
       )
     : rowLayout?.header ?? null;
@@ -402,7 +550,7 @@ export function withTotals(layout, rolled, options = {}) {
         rolled.col.chain,
         colSlots,
         slotMap(colSlots),
-        totalSlotOf(colSlots),
+        totalSlotsOf(colSlots),
         mapCol,
       )
     : colLayout?.header ?? null;
@@ -536,21 +684,14 @@ export function withRowTotals(layout, rolled, options = {}) {
   );
   const cellMap = new Map(cells.map((cell) => [cell.key, cell]));
 
-  const slotByKey = new Map();
-  let totalSlot = null;
-  for (const slot of slots) {
-    if (slot.kind === 'total') totalSlot = slot;
-    else slotByKey.set(`${slot.depth}|${slot.oldOffset}`, slot);
-  }
-
   const rowHeader = rebuildAxisHeader(
     layout.axes.row.header,
     'row',
     0,
     layout.axes.row.chain ?? [],
     slots,
-    slotByKey,
-    totalSlot,
+    slotMap(slots),
+    totalSlotsOf(slots),
     mapOffset,
   );
 
@@ -919,7 +1060,7 @@ function collectAxisSlots(axisLayout, axisRolled, labels) {
         const nextValues = [...values, member.value];
         const dimension = depthByDimension.get(depth);
         if (dimension) {
-          slots.push({
+          const baseSlot = {
             oldOffset: member.offset + member.size,
             depth,
             dimension,
@@ -929,7 +1070,8 @@ function collectAxisSlots(axisLayout, axisRolled, labels) {
             })),
             label: subtotalLabel(member.value, labels.subtotal),
             kind: 'subtotal',
-          });
+          };
+          slots.push(...expandMeasureSlot(baseSlot, axisRolled));
         }
         if (member.children) walk(member.children, depth + 1, nextValues);
       }
@@ -938,25 +1080,44 @@ function collectAxisSlots(axisLayout, axisRolled, labels) {
   }
 
   if (axisRolled.grandTotal) {
-    slots.push({
+    const baseSlot = {
       oldOffset: axisLayout.length,
       depth: -1,
       dimension: null,
       path: [],
       label: totalLabel(labels.total),
       kind: 'total',
-    });
+    };
+    slots.push(...expandMeasureSlot(baseSlot, axisRolled));
   }
 
   slots.sort((a, b) => {
     if (a.oldOffset !== b.oldOffset) return a.oldOffset - b.oldOffset;
     if (a.depth !== b.depth) return b.depth - a.depth;
-    return kindRank(a.kind) - kindRank(b.kind);
+    const kindDiff = kindRank(a.kind) - kindRank(b.kind);
+    if (kindDiff !== 0) return kindDiff;
+    return (a.order ?? 0) - (b.order ?? 0);
   });
   slots.forEach((slot, index) => {
     slot.newOffset = slot.oldOffset + index;
   });
   return slots;
+}
+
+function expandMeasureSlot(slot, axisRolled) {
+  const measure = axisRolled.measure;
+  if (!measure?.members?.length) return [slot];
+
+  return measure.members.map((label, index) => ({
+    ...slot,
+    path:
+      slot.kind === 'subtotal'
+        ? [...slot.path, { key: measure.key, value: label }]
+        : [{ key: measure.key, value: label }],
+    label: `${slot.label} · ${label}`,
+    measure: label,
+    order: index,
+  }));
 }
 
 function createOffsetMapper(slots) {
@@ -976,13 +1137,16 @@ function slotMap(slots) {
   const map = new Map();
   for (const slot of slots) {
     if (slot.kind === 'total') continue;
-    map.set(`${slot.depth}|${slot.oldOffset}`, slot);
+    const key = `${slot.depth}|${slot.oldOffset}`;
+    const list = map.get(key);
+    if (list) list.push(slot);
+    else map.set(key, [slot]);
   }
   return map;
 }
 
-function totalSlotOf(slots) {
-  return slots.find((slot) => slot.kind === 'total') ?? null;
+function totalSlotsOf(slots) {
+  return slots.filter((slot) => slot.kind === 'total');
 }
 
 function collectBasePositions(axisLayout, chain) {
@@ -1143,7 +1307,7 @@ function rebuildAxisHeader(
   chain,
   slots,
   slotByKey,
-  totalSlot,
+  totalSlots,
   mapOffset,
 ) {
   const members = [];
@@ -1163,23 +1327,25 @@ function rebuildAxisHeader(
         chain,
         slots,
         slotByKey,
-        null,
+        [],
         mapOffset,
       );
     }
 
-    const slot = slotByKey.get(`${depth}|${end}`);
-    if (slot) {
+    const ownerSlots = slotByKey.get(`${depth}|${end}`);
+    if (ownerSlots) {
       if (!cloned.children) {
         throw new Error(
-          `withTotals: 小计维度 ${slot.dimension} 必须是父维度`,
+          `withTotals: 小计维度 ${ownerSlots[0].dimension} 必须是父维度`,
         );
       }
       cloned.children = {
         ...cloned.children,
         members: [
           ...cloned.children.members,
-          makeSubtotalMember(slot, depth + 1, chain, axis),
+          ...ownerSlots.map((slot) =>
+            makeSubtotalMember(slot, depth + 1, chain, axis),
+          ),
         ],
       };
     }
@@ -1187,8 +1353,10 @@ function rebuildAxisHeader(
     members.push(cloned);
   }
 
-  if (depth === 0 && totalSlot) {
-    members.push(makeTotalMember(totalSlot, chain, axis));
+  if (depth === 0) {
+    for (const slot of totalSlots) {
+      members.push(makeTotalMember(slot, chain, axis));
+    }
   }
 
   return { ...node, members };
