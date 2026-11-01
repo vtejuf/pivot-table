@@ -802,7 +802,7 @@ select:disabled {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px 16px;
   border-top: 1px dashed var(--line);
   padding: 12px 18px;
   background: #fcfdff;
@@ -815,6 +815,30 @@ select:disabled {
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.demo-extensions__options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.demo-extensions .check {
+  padding-bottom: 0;
+  color: #475569;
+  font-size: 12px;
+}
+
+.demo-extensions .check input {
+  width: 15px;
+  height: 15px;
+}
+
+.demo-extensions__divider {
+  width: 1px;
+  height: 18px;
+  background: var(--line);
 }
 
 .demo-extensions button {
@@ -1390,8 +1414,7 @@ kbd {
   }
 
   .field,
-  .field--range,
-  .check {
+  .field--range {
     flex: 1 1 100%;
   }
 
@@ -1411,6 +1434,23 @@ kbd {
   .demo-status {
     flex-direction: column;
     gap: 3px;
+  }
+
+  .demo-extensions {
+    align-items: flex-start;
+  }
+
+  .demo-extensions__options {
+    flex: 1 1 100%;
+    gap: 8px 14px;
+  }
+
+  .demo-extensions__divider {
+    display: none;
+  }
+
+  .demo-extensions__hint {
+    flex: 1 1 100%;
   }
 
   .footer {

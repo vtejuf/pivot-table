@@ -212,11 +212,11 @@ const { geometry, stats } = renderPivot(canvas, result, {
 
 - 多层行 / 列表头，滚动时冻结在视口边缘；
 - 视口虚拟化，只遍历并绘制可见单元格，网格线批量描边；
-- **并列度量**：feature 层把度量作为列轴最末维度，Demo 工具栏可开关；
+- **并列度量**：feature 层把度量作为列轴最末维度，Demo 扩展位可开关；
 - **热力图 feature**：通过 `cellStyle` 渲染；单度量共用一个范围，双度量按
   `measure` 分别计算 min/max 和色阶，互不干扰；
 - **自定义叠加 feature**：`renderWithOverlay()` 在核心绘制后追加装饰，附角区
-  维度名示例；Demo 工具栏可开关，核心几何与绘制顺序不变；
+  维度名示例；Demo 扩展位可开关，核心几何与绘制顺序不变；
 - **行/列小计/总计 feature**：`rollupTotals()` 统一上卷，多度量用
   `rollupMultiTotals()` 按 measure 分列；`withTotals()` 插入行/列、重建表头并
   填充交叉格；支持指定维度、末尾汇总，核心模型与渲染器不改；

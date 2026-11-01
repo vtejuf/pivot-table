@@ -269,41 +269,6 @@ y  =  [   3       1      0     0 ] · v</pre>
                 </select>
               </label>
 
-              <label class="check">
-                <input type="checkbox" data-demo-dual-measure />
-                <span>并列度量</span>
-              </label>
-
-              <label class="check">
-                <input type="checkbox" data-demo-heatmap checked />
-                <span>数值色阶</span>
-              </label>
-
-              <label class="check">
-                <input type="checkbox" data-demo-overlay checked />
-                <span>角区标签</span>
-              </label>
-
-              <label class="check">
-                <input type="checkbox" data-demo-row-subtotal checked />
-                <span>行小计</span>
-              </label>
-
-              <label class="check">
-                <input type="checkbox" data-demo-row-total checked />
-                <span>行总计</span>
-              </label>
-
-              <label class="check">
-                <input type="checkbox" data-demo-col-subtotal checked />
-                <span>列小计</span>
-              </label>
-
-              <label class="check">
-                <input type="checkbox" data-demo-col-total checked />
-                <span>列总计</span>
-              </label>
-
               <label class="field field--range">
                 <span>列宽</span>
                 <input
@@ -336,11 +301,49 @@ y  =  [   3       1      0     0 ] · v</pre>
               <span data-demo-matrix></span>
             </div>
 
-            <div class="demo-extensions" aria-label="规划中的 Demo 功能">
+            <div class="demo-extensions" aria-label="Demo 显示选项与扩展功能">
               <span class="demo-extensions__label">Demo 扩展位</span>
-              <button type="button" disabled>小计 / 总计</button>
+
+              <div class="demo-extensions__options">
+                <label class="check">
+                  <input type="checkbox" data-demo-dual-measure />
+                  <span>并列度量</span>
+                </label>
+
+                <label class="check">
+                  <input type="checkbox" data-demo-heatmap checked />
+                  <span>数值色阶</span>
+                </label>
+
+                <label class="check">
+                  <input type="checkbox" data-demo-overlay checked />
+                  <span>角区标签</span>
+                </label>
+
+                <label class="check">
+                  <input type="checkbox" data-demo-row-subtotal checked />
+                  <span>行小计</span>
+                </label>
+
+                <label class="check">
+                  <input type="checkbox" data-demo-row-total checked />
+                  <span>行总计</span>
+                </label>
+
+                <label class="check">
+                  <input type="checkbox" data-demo-col-subtotal checked />
+                  <span>列小计</span>
+                </label>
+
+                <label class="check">
+                  <input type="checkbox" data-demo-col-total checked />
+                  <span>列总计</span>
+                </label>
+              </div>
+
+              <span class="demo-extensions__divider" aria-hidden="true"></span>
               <button type="button" disabled>折叠 / 展开</button>
-              <span class="demo-extensions__hint">后续接入模型层</span>
+              <span class="demo-extensions__hint">折叠 / 展开后续接入模型层</span>
             </div>
 
             <p class="demo-error" data-demo-error role="alert" hidden></p>
