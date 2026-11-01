@@ -5,7 +5,9 @@ import { renderPivot } from '../../src/render/index.mjs';
 import {
   pathKey,
   rollupRowTotals,
+  rollupTotals,
   withRowTotals,
+  withTotals,
 } from '../../src/features/totals.mjs';
 
 const dimensions = [
@@ -21,6 +23,20 @@ const detail = [
   { region: 'west', city: 'chengdu', year: 2023, sales: 40 },
 ];
 
+const gridDimensions = [
+  { key: 'region', axis: 'row' },
+  { key: 'city', axis: 'row', parent: 'region' },
+  { key: 'year', axis: 'col' },
+  { key: 'product', axis: 'col', parent: 'year' },
+];
+
+const gridDetail = [
+  { region: 'east', city: 'hangzhou', year: 2023, product: 'phone', sales: 10 },
+  { region: 'east', city: 'hangzhou', year: 2024, product: 'phone', sales: 20 },
+  { region: 'east', city: 'shanghai', year: 2023, product: 'laptop', sales: 30 },
+  { region: 'west', city: 'chengdu', year: 2023, product: 'phone', sales: 40 },
+];
+
 function makeCube(measure = { key: 'sales', aggregate: 'sum' }, rows = detail) {
   return aggregate(rows, { dimensions, measure });
 }
@@ -30,6 +46,21 @@ function makeBase(cube = makeCube(), mode = 'cartesian') {
     dimensions,
     value: cube.measure.key,
     mode,
+  });
+}
+
+function makeGridCube() {
+  return aggregate(gridDetail, {
+    dimensions: gridDimensions,
+    measure: { key: 'sales', aggregate: 'sum' },
+  });
+}
+
+function makeGridBase(cube = makeGridCube()) {
+  return layoutPivot(cube.rows, {
+    dimensions: gridDimensions,
+    value: cube.measure.key,
+    mode: 'compact',
   });
 }
 
@@ -256,6 +287,339 @@ test('min / max 合并子组并跳过空组', () => {
     30,
   );
   assert.equal(maxRolled.grand.get(pathKey([2023])).value, 40);
+});
+
+test('rollupTotals：列小计/总计按基础行路径上卷', () => {
+  const cube = makeGridCube();
+  const rolled = rollupTotals(cube, {
+    cols: { subtotals: ['year'], grandTotal: true },
+  });
+
+  assert.deepEqual(rolled.row.chain, ['region', 'city']);
+  assert.deepEqual(rolled.col.chain, ['year', 'product']);
+  assert.deepEqual(rolled.row.dimensions, []);
+  assert.deepEqual(rolled.col.dimensions, ['year']);
+  assert.equal(rolled.col.grandTotal, true);
+
+  const hangzhou = rolled.cells.get(pathKey(['east', 'hangzhou']));
+  assert.equal(hangzhou.get(pathKey([2023])).value, 10);
+  assert.equal(hangzhou.get(pathKey([2024])).value, 20);
+  assert.equal(hangzhou.get(pathKey([])).value, 30);
+
+  const shanghai = rolled.cells.get(pathKey(['east', 'shanghai']));
+  assert.equal(shanghai.get(pathKey([2023])).value, 30);
+  assert.equal(shanghai.get(pathKey([])).value, 30);
+
+  const chengdu = rolled.cells.get(pathKey(['west', 'chengdu']));
+  assert.equal(chengdu.get(pathKey([2023])).value, 40);
+  assert.equal(chengdu.has(pathKey([2024])), false);
+  assert.equal(chengdu.get(pathKey([])).value, 40);
+
+  // 基础行 × 基础列已经由 layout.cells 提供，不进入汇总表。
+  assert.equal(hangzhou.get(pathKey([2023, 'phone'])), undefined);
+});
+
+test('rollupTotals：行列小计/总计交叉格', () => {
+  const cube = makeGridCube();
+  const rolled = rollupTotals(cube, {
+    rows: { subtotals: ['region'], grandTotal: true },
+    cols: { subtotals: ['year'], grandTotal: true },
+  });
+
+  assert.deepEqual(rolled.row.dimensions, ['region']);
+  assert.deepEqual(rolled.col.dimensions, ['year']);
+
+  const east2023 = rolled.cells.get(pathKey(['east'])).get(pathKey([2023]));
+  assert.equal(east2023.value, 40);
+  assert.equal(east2023.__count, 2);
+  assert.equal(
+    rolled.cells.get(pathKey(['east'])).get(pathKey([])).value,
+    60,
+  );
+  assert.equal(
+    rolled.cells.get(pathKey([])).get(pathKey([2023])).value,
+    80,
+  );
+  assert.equal(
+    rolled.cells.get(pathKey([])).get(pathKey([2024])).value,
+    20,
+  );
+  assert.equal(rolled.cells.get(pathKey([])).get(pathKey([])).value, 100);
+});
+
+test('rollupTotals：自定义 reducer 收到列维度上下文', () => {
+  const calls = [];
+  const rolled = rollupTotals(makeGridCube(), {
+    cols: { subtotals: ['year'], grandTotal: true },
+    reduce(records, context) {
+      calls.push({ length: records.length, context });
+      return { value: records.length };
+    },
+  });
+
+  const yearSubtotal = calls.find(
+    (call) =>
+      call.context.colDimension === 'year' &&
+      call.context.colKind === 'subtotal' &&
+      call.context.rowKind === 'base' &&
+      call.context.path[0].value === 'east' &&
+      call.context.path[1].value === 'hangzhou',
+  );
+  assert.ok(yearSubtotal);
+  assert.equal(yearSubtotal.length, 1);
+
+  const total = calls.find(
+    (call) =>
+      call.context.colKind === 'total' &&
+      call.context.rowKind === 'base' &&
+      call.context.path[0].value === 'east' &&
+      call.context.path[1].value === 'hangzhou',
+  );
+  assert.ok(total);
+  assert.equal(total.length, 2);
+  assert.equal(
+    rolled.cells.get(pathKey(['east', 'hangzhou'])).get(pathKey([])).value,
+    2,
+  );
+});
+
+test('rollupTotals：叶子列维度被忽略', () => {
+  const cube = makeGridCube();
+  const base = makeGridBase(cube);
+  const rolled = rollupTotals(cube, {
+    cols: { subtotals: ['product'] },
+  });
+  assert.equal(rolled.skipped, true);
+  assert.deepEqual(rolled.col.dimensions, []);
+  assert.deepEqual(rolled.col.ignored, ['product']);
+  assert.equal(withTotals(base, rolled), base);
+});
+
+test('withTotals：列小计/总计插入列并重建列表头', () => {
+  const cube = makeGridCube();
+  const base = makeGridBase(cube);
+  const rolled = rollupTotals(cube, {
+    cols: { subtotals: ['year'], grandTotal: true },
+  });
+  const display = withTotals(base, rolled);
+
+  assert.equal(base.size.rows, 3);
+  assert.equal(base.size.cols, 3);
+  assert.equal(display.size.rows, 3);
+  assert.equal(display.size.cols, 6);
+  assert.equal(display.matrix, null);
+
+  assert.deepEqual(
+    display.axes.col.header.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      [2023, 0, 3, null],
+      [2024, 3, 2, null],
+      ['总计', 5, 1, 'total'],
+    ],
+  );
+
+  assert.deepEqual(
+    display.axes.col.header.members[0].children.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      ['phone', 0, 1, null],
+      ['laptop', 1, 1, null],
+      ['2023 小计', 2, 1, 'subtotal'],
+    ],
+  );
+
+  const totalMember = display.axes.col.header.members[2];
+  assert.equal(totalMember.children.members[0].value, '');
+  assert.equal(totalMember.children.members[0].offset, 5);
+
+  // 原始列 0,1 保持，原列 2 被 2023 小计推到 x=3。
+  assert.equal(display.cellMap.get('0,0').value, 10);
+  assert.equal(display.cellMap.get('3,0').value, 20);
+
+  // 基础行 × 列小计/总计。
+  assert.equal(display.cellMap.get('2,0').value, 10);
+  assert.equal(display.cellMap.get('4,0').value, 20);
+  assert.equal(display.cellMap.get('5,0').value, 30);
+  assert.equal(display.cellMap.get('2,1').value, 30);
+  assert.equal(display.cellMap.get('2,2').value, 40);
+  assert.equal(display.cellMap.get('5,2').value, 40);
+  assert.equal(display.cellMap.get('4,2'), undefined);
+
+  assertHeaderSizes(display.axes.row.header.members, display.size.rows);
+  assertHeaderSizes(display.axes.col.header.members, display.size.cols);
+});
+
+test('withTotals：行列同时汇总并填充交叉格', () => {
+  const cube = makeGridCube();
+  const base = makeGridBase(cube);
+  const before = {
+    rows: base.size.rows,
+    cols: base.size.cols,
+    cells: base.cells.length,
+    colHeader: base.axes.col.header.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+    ]),
+  };
+  const rolled = rollupTotals(cube, {
+    rows: { subtotals: ['region'], grandTotal: true },
+    cols: { subtotals: ['year'], grandTotal: true },
+  });
+  const display = withTotals(base, rolled);
+
+  assert.equal(base.size.rows, before.rows);
+  assert.equal(base.size.cols, before.cols);
+  assert.equal(base.cells.length, before.cells);
+  assert.deepEqual(
+    base.axes.col.header.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+    ]),
+    before.colHeader,
+  );
+
+  assert.equal(display.size.rows, 6);
+  assert.equal(display.size.cols, 6);
+  assert.deepEqual(
+    display.axes.row.header.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+    ]),
+    [
+      ['east', 0, 3],
+      ['west', 3, 2],
+      ['总计', 5, 1],
+    ],
+  );
+  assert.deepEqual(
+    display.axes.col.header.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+    ]),
+    [
+      [2023, 0, 3],
+      [2024, 3, 2],
+      ['总计', 5, 1],
+    ],
+  );
+
+  const east2023 = display.cellMap.get('2,2');
+  assert.equal(east2023.value, 40);
+  assert.equal(east2023.kind, 'subtotal');
+  assert.equal(east2023.rowKind, 'subtotal');
+  assert.equal(east2023.colKind, 'subtotal');
+  assert.equal(east2023.rowDimension, 'region');
+  assert.equal(east2023.colDimension, 'year');
+  assert.deepEqual(east2023.rowGroup, [{ key: 'region', value: 'east' }]);
+  assert.deepEqual(east2023.colGroup, [{ key: 'year', value: 2023 }]);
+  assert.deepEqual(east2023.members, { region: 'east', year: 2023 });
+
+  assert.equal(display.cellMap.get('4,2').value, 20);
+  assert.equal(display.cellMap.get('2,5').value, 80);
+  assert.equal(display.cellMap.get('4,5').value, 20);
+  assert.equal(display.cellMap.get('5,2').value, 60);
+  assert.equal(display.cellMap.get('5,5').value, 100);
+  assert.equal(display.cellMap.get('5,5').kind, 'total');
+
+  // 基础行 × 列小计、行小计 × 基础列。
+  assert.equal(display.cellMap.get('2,0').value, 10);
+  assert.equal(display.cellMap.get('0,2').value, 10);
+  assert.equal(display.cellMap.get('5,0').value, 30);
+
+  assertHeaderSizes(display.axes.row.header.members, display.size.rows);
+  assertHeaderSizes(display.axes.col.header.members, display.size.cols);
+});
+
+test('withTotals：纯列透视也能插入列汇总', () => {
+  const colOnlyDimensions = [
+    { key: 'year', axis: 'col' },
+    { key: 'product', axis: 'col', parent: 'year' },
+  ];
+  const colOnlyCube = aggregate(gridDetail, {
+    dimensions: colOnlyDimensions,
+    measure: { key: 'sales', aggregate: 'sum' },
+  });
+  const base = layoutPivot(colOnlyCube.rows, {
+    dimensions: colOnlyDimensions,
+    value: 'sales',
+    mode: 'compact',
+  });
+  const rolled = rollupTotals(colOnlyCube, {
+    cols: { subtotals: ['year'], grandTotal: true },
+  });
+  const display = withTotals(base, rolled);
+
+  assert.equal(base.size.rows, 1);
+  assert.equal(display.size.rows, 1);
+  assert.ok(display.size.cols > base.size.cols);
+  assert.equal(display.axes.row, null);
+  assert.equal(display.cellMap.get('2,0').value, 80);
+  assert.equal(display.cellMap.get('5,0').value, 100);
+  assertHeaderSizes(display.axes.col.header.members, display.size.cols);
+});
+
+test('withTotals：展示布局可以直接渲染行/列汇总', () => {
+  const cube = makeGridCube();
+  const display = withTotals(
+    makeGridBase(cube),
+    rollupTotals(cube, {
+      rows: { subtotals: ['region'], grandTotal: true },
+      cols: { subtotals: ['year'], grandTotal: true },
+    }),
+  );
+  const { ctx, calls } = createFakeContext();
+  const { stats } = renderPivot(ctx, display);
+  const texts = textValues(calls);
+
+  assert.equal(stats.cellsInGrid, 36);
+  assert.equal(stats.drawnValues, 26);
+  assert.ok(texts.includes('east 小计'));
+  assert.ok(texts.includes('2023 小计'));
+  assert.ok(texts.includes('总计'));
+  assert.ok(texts.includes('40'));
+  assert.ok(texts.includes('100'));
+});
+
+test('withTotals：只开行汇总时与行布局一致', () => {
+  const cube = makeCube();
+  const base = makeBase(cube);
+  const rowDisplay = withRowTotals(
+    base,
+    rollupRowTotals(cube, {
+      rows: { subtotals: ['region'], grandTotal: true },
+    }),
+  );
+  const display = withTotals(
+    base,
+    rollupTotals(cube, {
+      rows: { subtotals: ['region'], grandTotal: true },
+    }),
+  );
+
+  assert.equal(display.size.rows, rowDisplay.size.rows);
+  assert.equal(display.size.cols, rowDisplay.size.cols);
+  assert.deepEqual(display.axes.row.header, rowDisplay.axes.row.header);
+  assert.deepEqual(display.axes.col, rowDisplay.axes.col);
+
+  for (const cell of rowDisplay.cells) {
+    const other = display.cellMap.get(cell.key);
+    assert.ok(other, `缺少单元格 ${cell.key}`);
+    assert.equal(other.value, cell.value);
+    assert.equal(other.kind, cell.kind);
+  }
 });
 
 test('withRowTotals 插入小计/总计行并重建表头', () => {

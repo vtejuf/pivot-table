@@ -33,7 +33,7 @@ src/
     dual-measure.mjs   并列度量：度量作为最末列维度（附加功能）
     heatmap.mjs        热力图：通过 cellStyle 渲染，按 measure 分组色阶
     overlay.mjs        自定义叠加：核心绘制后追加装饰（附角区示例）
-    totals.mjs         行小计/行总计：上卷 + 展示布局派生（行轴 P1）
+    totals.mjs         行/列小计/总计：统一上卷 + 双轴展示布局
 site/
   main.mjs             主页导航与 Demo 初始化
   demo.mjs             主页 / 示例共用的 Demo 控制器
@@ -45,7 +45,7 @@ test/
     dual-measure.test.mjs  并列度量测试
     heatmap.test.mjs       热力图测试
     overlay.test.mjs       自定义叠加与角区示例测试
-    totals.test.mjs        行小计/行总计测试
+    totals.test.mjs        行/列小计/总计测试
   architecture.test.mjs    核心不反向依赖 features
 examples/
   demo.mjs             终端输出布局结果
@@ -65,7 +65,7 @@ docs/
   matrix-transform.md  矩阵推导与 cartesian/compact 差异
   rendering.md         Canvas 渲染管线与性能方案
   features-architecture.md  附加功能架构与边界
-  totals.md            行小计/行总计设计与上卷规则
+  totals.md            行/列小计/总计设计与上卷规则
 ```
 
 ## 快速开始
@@ -217,8 +217,8 @@ const { geometry, stats } = renderPivot(canvas, result, {
   `measure` 分别计算 min/max 和色阶，互不干扰；
 - **自定义叠加 feature**：`renderWithOverlay()` 在核心绘制后追加装饰，附角区
   维度名示例；Demo 工具栏可开关，核心几何与绘制顺序不变；
-- **行小计/行总计 feature**：`rollupRowTotals()` 先在聚合结果上上卷，
-  `withRowTotals()` 再插入行、重建表头；首期支持指定行维度、末尾小计和行总计，
+- **行/列小计/总计 feature**：`rollupTotals()` 统一上卷，`withTotals()`
+  插入行/列、重建表头并填充交叉格；首期支持指定维度、末尾汇总和单度量，
   核心模型与渲染器不改；
 - 核心渲染器只保留 `cellStyle` / `formatValue` 接缝，不再包含热力图逻辑；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；

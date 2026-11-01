@@ -10,6 +10,8 @@
  *   [data-demo-overlay]  角区标签开关
  *   [data-demo-row-subtotal] 行小计 checkbox
  *   [data-demo-row-total]    行总计 checkbox
+ *   [data-demo-col-subtotal] 列小计 checkbox
+ *   [data-demo-col-total]    列总计 checkbox
  *   [data-demo-width]    列宽 range
  *   [data-demo-reset]    重置滚动按钮
  *   [data-demo-zoom]     列宽显示
@@ -18,8 +20,8 @@
  * 并列度量只负责布局数据：度量作为列轴最末层维度。热力图由 feature 通过
  * cellStyle 提供；双度量时按 measure 分别计算色阶。
  *
- * 行小计/总计由 features/totals.mjs 接入：先 rollupRowTotals() 上卷，再用
- * withRowTotals() 派生展示布局。并列度量暂不支持行汇总，控件会禁用。
+ * 行/列小计、总计由 features/totals.mjs 接入：先 rollupTotals() 统一上卷，
+ * 再用 withTotals() 派生展示布局。并列度量暂不支持汇总，控件会禁用。
  *
  * 后续扩展点（折叠/展开）：
  * - 在 rebuildLayout() 里对可见成员集合做过滤或上卷，再调用 totals/layout；
@@ -35,8 +37,8 @@ import {
 import { combineMeasures } from '../src/features/dual-measure.mjs';
 import { createHeatmapStyle } from '../src/features/heatmap.mjs';
 import {
-  rollupRowTotals,
-  withRowTotals,
+  rollupTotals,
+  withTotals,
 } from '../src/features/totals.mjs';
 import { salesCube, countCube } from '../examples/sample-data.mjs';
 
@@ -58,6 +60,8 @@ export function createPivotDemo(root = document, options = {}) {
   const overlayInput = scope.querySelector('[data-demo-overlay]');
   const rowSubtotalInput = scope.querySelector('[data-demo-row-subtotal]');
   const rowTotalInput = scope.querySelector('[data-demo-row-total]');
+  const colSubtotalInput = scope.querySelector('[data-demo-col-subtotal]');
+  const colTotalInput = scope.querySelector('[data-demo-col-total]');
   const widthInput = scope.querySelector('[data-demo-width]');
   const resetButton = scope.querySelector('[data-demo-reset]');
   const zoomEl = scope.querySelector('[data-demo-zoom]');
@@ -114,6 +118,8 @@ export function createPivotDemo(root = document, options = {}) {
     if (measureSelect) measureSelect.disabled = dual;
     if (rowSubtotalInput) rowSubtotalInput.disabled = dual;
     if (rowTotalInput) rowTotalInput.disabled = dual;
+    if (colSubtotalInput) colSubtotalInput.disabled = dual;
+    if (colTotalInput) colTotalInput.disabled = dual;
   }
 
   function rebuildLayout(resetScroll = true) {
@@ -126,14 +132,23 @@ export function createPivotDemo(root = document, options = {}) {
     });
 
     totalsActive = false;
-    if (!dual && (rowSubtotalInput?.checked || rowTotalInput?.checked)) {
-      const rolled = rollupRowTotals(cube, {
+    const rowSubtotal = Boolean(rowSubtotalInput?.checked);
+    const rowTotal = Boolean(rowTotalInput?.checked);
+    const colSubtotal = Boolean(colSubtotalInput?.checked);
+    const colTotal = Boolean(colTotalInput?.checked);
+
+    if (!dual && (rowSubtotal || rowTotal || colSubtotal || colTotal)) {
+      const rolled = rollupTotals(cube, {
         rows: {
-          subtotals: rowSubtotalInput?.checked ? ['region'] : [],
-          grandTotal: Boolean(rowTotalInput?.checked),
+          subtotals: rowSubtotal ? ['region'] : [],
+          grandTotal: rowTotal,
+        },
+        cols: {
+          subtotals: colSubtotal ? ['year'] : [],
+          grandTotal: colTotal,
         },
       });
-      layout = withRowTotals(base, rolled);
+      layout = withTotals(base, rolled);
       totalsActive = !rolled.skipped;
     } else {
       layout = base;
@@ -198,7 +213,7 @@ export function createPivotDemo(root = document, options = {}) {
       gridSizeEl.innerHTML =
         `<strong>${layout.size.rows} 行 × ${layout.size.cols} 列</strong>` +
         ` · ${layout.mode}` +
-        (totalsActive ? ' · 行小计/总计' : '') +
+        (totalsActive ? ' · 行/列汇总' : '') +
         (isDual() ? ' · 并列度量' : '');
     }
 
@@ -211,7 +226,7 @@ export function createPivotDemo(root = document, options = {}) {
 
     if (matrixEl) {
       matrixEl.textContent = totalsActive
-        ? '行汇总 · 无全局矩阵'
+        ? '含汇总 · 无全局矩阵'
         : layout.matrix
           ? `固定矩阵 ${layout.matrix.length}×${layout.matrix[0].length}`
           : '分段仿射 · 无全局矩阵';
@@ -228,6 +243,8 @@ export function createPivotDemo(root = document, options = {}) {
   listen(overlayInput, 'change', render);
   listen(rowSubtotalInput, 'change', () => rebuildLayout());
   listen(rowTotalInput, 'change', () => rebuildLayout());
+  listen(colSubtotalInput, 'change', () => rebuildLayout());
+  listen(colTotalInput, 'change', () => rebuildLayout());
   listen(widthInput, 'input', render);
   listen(resetButton, 'click', () => {
     scrollX = 0;
