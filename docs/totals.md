@@ -101,8 +101,9 @@ const reduce = (records, context) => ({
 
 - 每个配置维度的每个 member 块末尾插入一个 `size = 1` 的小计槽；行轴末尾插入
   总计槽。
-- 小计/总计 member 作为该维度的**同级 member**：`value = '华东 小计'`、
-  `children = null`，原始 member 的 `size` 不变，后续 member 的 `offset` 后移。
+- 小计 member 挂到父 member 的子层末尾：父 member 的 `size` 增加小计行，父标签
+  纵向覆盖小计行；子层显示“小计”。数据坐标不变，只改表头树。
+- 总计 member 在根层；如果还有更深层，补空占位 children 链，填满表头背景和边框。
 - 原始 cells 的 `y` 按插入数量平移；小计/总计 cells 使用槽位的新坐标。
 - 汇总格带 `cell.kind = 'subtotal' | 'total'`、`cell.rowGroup` 和实际匹配的
   `members`；不伪造被折叠子维度的值。
@@ -110,8 +111,10 @@ const reduce = (records, context) => ({
 - `matrix` 置 `null`；`points` 置空；`toPixel()` 按新 cells 重新实现。
 - 输入 layout 不被修改。
 
-表头在小计行的更深层位置会留空（小计 member 没有 children），这是当前渲染器
-的正常表现；首期接受这个视觉限制，后续可用 overlay 或表头样式扩展补背景。
+表头不变量：同一层 members 的 `size` 之和等于父 member 的 `size`，根层之和等于
+`size.rows`；小计/总计行在每一层都有表头单元格。父级标签覆盖小计行属于
+rowspan 式覆盖，不是真正的单格跨层合并；需要单个标签横跨多个表头层时，仍需
+核心 `depthSpan` 或 overlay 扩展。
 
 ## 5. 边界
 
@@ -128,8 +131,9 @@ const reduce = (records, context) => ({
 
 - 上卷：小计/总计值、叶子维度忽略、全关短路、自定义 reducer、avg 加权、
   min/max、输入记录不被修改。
-- 布局：槽位顺序、表头 `offset / size`、`cellMap`、`size.rows`、原始 cells
-  映射、`matrix = null`、`toPixel()`。
+- 布局：槽位顺序、表头 `offset / size`、父块 size 包含小计行、三层行轴的
+  占位链、多层小计嵌套时的 size 连续性、表头 size 不变量、`cellMap`、
+  `size.rows`、原始 cells 映射、`matrix = null`、`toPixel()`。
 - 渲染：fake context 下出现“east 小计”“总计”文本，绘制格数增加。
 - 站点：DOM 桩确认开关开启/关闭时汇总行出现/消失。
 
@@ -137,6 +141,8 @@ const reduce = (records, context) => ({
 
 1. 列轴小计与双轴交叉格。
 2. 多度量按 measure 分块上卷。
-3. 表头样式（overlay 或核心 `headerCellStyle` 扩展）。
-4. 折叠/展开联动：折叠组只显示父行，展开后显示子行 + 小计；汇总始终从基础
+3. 可选的真正跨层表头合并（核心 `depthSpan` 或 overlay），用于把“小计/总计”
+   做成单个横跨多层表头的合并格。
+4. 表头样式（overlay 或核心 `headerCellStyle` 扩展）。
+5. 折叠/展开联动：折叠组只显示父行，展开后显示子行 + 小计；汇总始终从基础
    cells 计算，不重复计入折叠产生的汇总行。

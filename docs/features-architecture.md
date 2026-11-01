@@ -114,6 +114,8 @@ renderer 的绘制路径。
 - `withRowTotals(layout, rolled, options)`：路线 B，在基础布局上插入小计 /
   总计行，重建 `axes.row.header`、`cells`、`cellMap`、`size`；列轴不变，
   `matrix` 置 `null`。
+- 小计挂到父 member 的子层末尾，父 `size` 覆盖小计行；总计行的深层表头用空
+  占位 children 链填满，不再留空洞。
 - `subtotals: ['region']` 指定维度；叶子维度静默忽略；位置固定末尾。
 - 内置 `sum / count / avg / min / max` 上卷规则；`avg` 用 `__valueCount`
   加权；可传纯函数 `reduce(records, context)` 覆盖。

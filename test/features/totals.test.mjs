@@ -85,6 +85,18 @@ function textValues(calls) {
     .map((call) => call.args[0]);
 }
 
+function assertHeaderSizes(members, expected) {
+  assert.equal(
+    members.reduce((sum, member) => sum + member.size, 0),
+    expected,
+  );
+  for (const member of members) {
+    if (member.children) {
+      assertHeaderSizes(member.children.members, member.size);
+    }
+  }
+}
+
 test('上卷：按 region 生成小计，按列组合保留值', () => {
   const cube = makeCube();
   const rolled = rollupRowTotals(cube, {
@@ -269,13 +281,47 @@ test('withRowTotals 插入小计/总计行并重建表头', () => {
       member.kind ?? null,
     ]),
     [
-      ['east', 0, 3, null],
-      ['east 小计', 3, 1, 'subtotal'],
-      ['west', 4, 3, null],
-      ['west 小计', 7, 1, 'subtotal'],
+      ['east', 0, 4, null],
+      ['west', 4, 4, null],
       ['总计', 8, 1, 'total'],
     ],
   );
+
+  assert.deepEqual(
+    display.axes.row.header.members[0].children.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      ['hangzhou', 0, 1, null],
+      ['shanghai', 1, 1, null],
+      ['chengdu', 2, 1, null],
+      ['east 小计', 3, 1, 'subtotal'],
+    ],
+  );
+
+  assert.deepEqual(
+    display.axes.row.header.members[1].children.members.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      ['hangzhou', 4, 1, null],
+      ['shanghai', 5, 1, null],
+      ['chengdu', 6, 1, null],
+      ['west 小计', 7, 1, 'subtotal'],
+    ],
+  );
+
+  const totalMember = display.axes.row.header.members[2];
+  assert.equal(totalMember.children.members[0].value, '');
+  assert.equal(totalMember.children.members[0].offset, 8);
+  assert.equal(totalMember.children.members[0].size, 1);
+  assertHeaderSizes(display.axes.row.header.members, display.size.rows);
 
   const east2023 = display.cellMap.get('0,3');
   assert.equal(east2023.value, 40);
@@ -322,7 +368,15 @@ test('布局派生：只开总计或只开小计', () => {
       ['总计', 6, 1, 'total'],
     ],
   );
+  assert.equal(
+    onlyTotal.axes.row.header.members[2].children.members[0].value,
+    '',
+  );
   assert.equal(onlyTotal.cellMap.get('0,6').value, 80);
+  assertHeaderSizes(
+    onlyTotal.axes.row.header.members,
+    onlyTotal.size.rows,
+  );
 
   const onlySubtotal = withRowTotals(
     base,
@@ -337,13 +391,175 @@ test('布局派生：只开总计或只开小计', () => {
       member.kind ?? null,
     ]),
     [
-      ['east', 0, 3, null],
-      ['east 小计', 3, 1, 'subtotal'],
-      ['west', 4, 3, null],
-      ['west 小计', 7, 1, 'subtotal'],
+      ['east', 0, 4, null],
+      ['west', 4, 4, null],
     ],
   );
+  assert.equal(
+    onlySubtotal.axes.row.header.members[0].children.members[3].value,
+    'east 小计',
+  );
   assert.equal(onlySubtotal.cellMap.get('0,3').value, 40);
+  assertHeaderSizes(
+    onlySubtotal.axes.row.header.members,
+    onlySubtotal.size.rows,
+  );
+});
+
+test('三层行轴：小计和总计的深层表头都被占位填满', () => {
+  const deepDimensions = [
+    { key: 'region', axis: 'row' },
+    { key: 'city', axis: 'row', parent: 'region' },
+    { key: 'store', axis: 'row', parent: 'city' },
+    { key: 'year', axis: 'col' },
+  ];
+  const deepDetail = [
+    { region: 'east', city: 'hangzhou', store: 'A', year: 2023, sales: 10 },
+    { region: 'east', city: 'hangzhou', store: 'B', year: 2023, sales: 20 },
+    { region: 'west', city: 'chengdu', store: 'C', year: 2023, sales: 30 },
+  ];
+  const deepCube = aggregate(deepDetail, {
+    dimensions: deepDimensions,
+    measure: { key: 'sales', aggregate: 'sum' },
+  });
+  const deepBase = layoutPivot(deepCube.rows, {
+    dimensions: deepDimensions,
+    value: 'sales',
+    mode: 'compact',
+  });
+  const deepRolled = rollupRowTotals(deepCube, {
+    rows: { subtotals: ['region'], grandTotal: true },
+  });
+  const deepDisplay = withRowTotals(deepBase, deepRolled);
+
+  assert.equal(deepBase.size.rows, 3);
+  assert.equal(deepDisplay.size.rows, 6);
+  assert.equal(deepDisplay.cellMap.get('0,2').value, 30);
+  assert.equal(deepDisplay.cellMap.get('0,3').value, 30);
+  assert.equal(deepDisplay.cellMap.get('0,4').value, 30);
+  assert.equal(deepDisplay.cellMap.get('0,5').value, 60);
+
+  const rootMembers = deepDisplay.axes.row.header.members;
+  assert.deepEqual(
+    rootMembers.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      ['east', 0, 3, null],
+      ['west', 3, 2, null],
+      ['总计', 5, 1, 'total'],
+    ],
+  );
+
+  const eastChildren = rootMembers[0].children.members;
+  assert.deepEqual(
+    eastChildren.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      ['hangzhou', 0, 2, null],
+      ['east 小计', 2, 1, 'subtotal'],
+    ],
+  );
+
+  const subtotalMember = eastChildren[1];
+  assert.equal(subtotalMember.children.key, 'store');
+  assert.equal(subtotalMember.children.members[0].value, '');
+  assert.equal(subtotalMember.children.members[0].offset, 2);
+
+  const totalChildren = rootMembers[2].children.members;
+  assert.equal(totalChildren[0].value, '');
+  assert.equal(totalChildren[0].offset, 5);
+  assert.equal(totalChildren[0].children.members[0].value, '');
+  assert.equal(totalChildren[0].children.members[0].offset, 5);
+
+  assertHeaderSizes(rootMembers, deepDisplay.size.rows);
+});
+
+test('多层小计：父块嵌套时表头 size 仍然连续', () => {
+  const deepDimensions = [
+    { key: 'region', axis: 'row' },
+    { key: 'city', axis: 'row', parent: 'region' },
+    { key: 'store', axis: 'row', parent: 'city' },
+    { key: 'year', axis: 'col' },
+  ];
+  const deepDetail = [
+    { region: 'east', city: 'hangzhou', store: 'A', year: 2023, sales: 10 },
+    { region: 'east', city: 'hangzhou', store: 'B', year: 2023, sales: 20 },
+    { region: 'west', city: 'chengdu', store: 'C', year: 2023, sales: 30 },
+  ];
+  const deepCube = aggregate(deepDetail, {
+    dimensions: deepDimensions,
+    measure: { key: 'sales', aggregate: 'sum' },
+  });
+  const deepBase = layoutPivot(deepCube.rows, {
+    dimensions: deepDimensions,
+    value: 'sales',
+    mode: 'compact',
+  });
+  const deepRolled = rollupRowTotals(deepCube, {
+    rows: { subtotals: ['region', 'city'], grandTotal: true },
+  });
+  const deepDisplay = withRowTotals(deepBase, deepRolled);
+
+  assert.equal(deepDisplay.size.rows, 8);
+  assert.equal(deepDisplay.cellMap.get('0,2').value, 30);
+  assert.equal(deepDisplay.cellMap.get('0,3').value, 30);
+  assert.equal(deepDisplay.cellMap.get('0,5').value, 30);
+  assert.equal(deepDisplay.cellMap.get('0,6').value, 30);
+  assert.equal(deepDisplay.cellMap.get('0,7').value, 60);
+
+  const rootMembers = deepDisplay.axes.row.header.members;
+  assert.deepEqual(
+    rootMembers.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      ['east', 0, 4, null],
+      ['west', 4, 3, null],
+      ['总计', 7, 1, 'total'],
+    ],
+  );
+
+  const eastChildren = rootMembers[0].children.members;
+  assert.deepEqual(
+    eastChildren.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      ['hangzhou', 0, 3, null],
+      ['east 小计', 3, 1, 'subtotal'],
+    ],
+  );
+
+  const hangzhouChildren = eastChildren[0].children.members;
+  assert.deepEqual(
+    hangzhouChildren.map((member) => [
+      member.value,
+      member.offset,
+      member.size,
+      member.kind ?? null,
+    ]),
+    [
+      ['A', 0, 1, null],
+      ['B', 1, 1, null],
+      ['hangzhou 小计', 2, 1, 'subtotal'],
+    ],
+  );
+
+  assertHeaderSizes(rootMembers, deepDisplay.size.rows);
 });
 
 test('withRowTotals 不修改输入布局', () => {
@@ -477,8 +693,12 @@ test('自定义标签替换默认文案', () => {
     },
   );
 
-  assert.equal(display.axes.row.header.members[1].value, 'east 汇总');
-  assert.equal(display.axes.row.header.members[4].value, '全部');
+  assert.equal(display.axes.row.header.members[0].value, 'east');
+  assert.equal(
+    display.axes.row.header.members[0].children.members[3].value,
+    'east 汇总',
+  );
+  assert.equal(display.axes.row.header.members[2].value, '全部');
 });
 
 test('展示布局可以直接交给 renderPivot', () => {

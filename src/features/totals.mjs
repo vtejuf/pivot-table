@@ -274,9 +274,11 @@ export function withRowTotals(layout, rolled, options = {}) {
   const rowHeader = rebuildRowHeader(
     layout.axes.row.header,
     0,
+    slots,
     slotByKey,
     totalSlot,
     mapOffset,
+    layout.axes.row.chain ?? [],
   );
 
   return {
@@ -575,50 +577,121 @@ function makeTotalsCell(slot, x, colValues, result, measure, colChain) {
   return cell;
 }
 
-function rebuildRowHeader(node, depth, slotByKey, totalSlot, mapOffset) {
+function rebuildRowHeader(
+  node,
+  depth,
+  slots,
+  slotByKey,
+  totalSlot,
+  mapOffset,
+  rowChain,
+) {
   const members = [];
   for (const member of node.members) {
+    const end = member.offset + member.size;
     const cloned = {
       ...member,
       offset: mapOffset(member.offset),
+      size: newMemberSize(member, depth, slots),
     };
+
     if (member.children) {
       cloned.children = rebuildRowHeader(
         member.children,
         depth + 1,
+        slots,
         slotByKey,
         null,
         mapOffset,
+        rowChain,
       );
     }
-    members.push(cloned);
 
-    const slot = slotByKey.get(`${depth}|${member.offset + member.size}`);
+    const slot = slotByKey.get(`${depth}|${end}`);
     if (slot) {
-      members.push({
-        value: slot.label,
-        index: -1,
-        offset: slot.newOffset,
-        size: 1,
-        children: null,
-        kind: slot.kind,
-        dimension: slot.dimension,
-      });
+      if (!cloned.children) {
+        throw new Error(
+          `withRowTotals: 小计维度 ${slot.dimension} 必须是父维度`,
+        );
+      }
+      cloned.children = {
+        ...cloned.children,
+        members: [
+          ...cloned.children.members,
+          makeSubtotalMember(slot, depth + 1, rowChain),
+        ],
+      };
     }
+
+    members.push(cloned);
   }
 
   if (depth === 0 && totalSlot) {
-    members.push({
-      value: totalSlot.label,
-      index: -1,
-      offset: totalSlot.newOffset,
-      size: 1,
-      children: null,
-      kind: 'total',
-    });
+    members.push(makeTotalMember(totalSlot, rowChain));
   }
 
   return { ...node, members };
+}
+
+/** 父 member 的新 size：原始行 + 内部小计 + 自己的小计行。 */
+function newMemberSize(member, depth, slots) {
+  const end = member.offset + member.size;
+  let size = member.size;
+
+  for (const slot of slots) {
+    if (slot.oldOffset > member.offset && slot.oldOffset < end) {
+      size += 1;
+    } else if (
+      slot.oldOffset === end &&
+      slot.kind === 'subtotal' &&
+      slot.depth >= depth
+    ) {
+      size += 1;
+    }
+  }
+
+  return size;
+}
+
+function makeSubtotalMember(slot, depth, rowChain) {
+  return {
+    value: slot.label,
+    index: -1,
+    offset: slot.newOffset,
+    size: 1,
+    children: placeholderChildren(slot, depth + 1, rowChain),
+    kind: 'subtotal',
+    dimension: slot.dimension,
+  };
+}
+
+function makeTotalMember(slot, rowChain) {
+  return {
+    value: slot.label,
+    index: -1,
+    offset: slot.newOffset,
+    size: 1,
+    children: placeholderChildren(slot, 1, rowChain),
+    kind: 'total',
+  };
+}
+
+/** 总计/小计占用的深层表头用空单元格填满，避免露出画布背景。 */
+function placeholderChildren(slot, depth, rowChain) {
+  if (depth >= rowChain.length) return null;
+  return {
+    key: rowChain[depth],
+    axis: 'row',
+    members: [
+      {
+        value: '',
+        index: -1,
+        offset: slot.newOffset,
+        size: 1,
+        children: placeholderChildren(slot, depth + 1, rowChain),
+      },
+    ],
+  };
 }
 
 // ---------------------------------------------------------------------------
