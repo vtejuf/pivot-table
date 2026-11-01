@@ -32,6 +32,7 @@ src/
   features/
     dual-measure.mjs   并列度量：度量作为最末列维度（附加功能）
     heatmap.mjs        热力图：通过 cellStyle 渲染，按 measure 分组色阶
+    overlay.mjs        自定义叠加：核心绘制后追加装饰（附角区示例）
 site/
   main.mjs             主页导航与 Demo 初始化
   demo.mjs             主页 / 示例共用的 Demo 控制器
@@ -42,6 +43,7 @@ test/
   features/
     dual-measure.test.mjs  并列度量测试
     heatmap.test.mjs       热力图测试
+    overlay.test.mjs       自定义叠加与角区示例测试
   architecture.test.mjs    核心不反向依赖 features
 examples/
   demo.mjs             终端输出布局结果
@@ -210,6 +212,8 @@ const { geometry, stats } = renderPivot(canvas, result, {
 - **并列度量**：feature 层把度量作为列轴最末维度，Demo 工具栏可开关；
 - **热力图 feature**：通过 `cellStyle` 渲染；单度量共用一个范围，双度量按
   `measure` 分别计算 min/max 和色阶，互不干扰；
+- **自定义叠加 feature**：`renderWithOverlay()` 在核心绘制后追加装饰，附角区
+  维度名示例；Demo 工具栏可开关，核心几何与绘制顺序不变；
 - 核心渲染器只保留 `cellStyle` / `formatValue` 接缝，不再包含热力图逻辑；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；
 - 传入 canvas 时按 DPR 设置物理像素，也可直接传 2D context；

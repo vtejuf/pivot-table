@@ -7,6 +7,7 @@
  *   [data-demo-measure]  度量 select：sales / count
  *   [data-demo-dual-measure] 并列度量 checkbox
  *   [data-demo-heatmap]  数值色阶 checkbox
+ *   [data-demo-overlay]  角区标签开关
  *   [data-demo-width]    列宽 range
  *   [data-demo-reset]    重置滚动按钮
  *   [data-demo-zoom]     列宽显示
@@ -23,6 +24,10 @@
 
 import { layoutPivot } from '../src/model/index.mjs';
 import { renderPivot } from '../src/render/index.mjs';
+import {
+  createCornerLabels,
+  renderWithOverlay,
+} from '../src/features/overlay.mjs';
 import { combineMeasures } from '../src/features/dual-measure.mjs';
 import { createHeatmapStyle } from '../src/features/heatmap.mjs';
 import { salesCube, countCube } from '../examples/sample-data.mjs';
@@ -42,6 +47,7 @@ export function createPivotDemo(root = document, options = {}) {
   const measureSelect = scope.querySelector('[data-demo-measure]');
   const dualInput = scope.querySelector('[data-demo-dual-measure]');
   const heatmapInput = scope.querySelector('[data-demo-heatmap]');
+  const overlayInput = scope.querySelector('[data-demo-overlay]');
   const widthInput = scope.querySelector('[data-demo-width]');
   const resetButton = scope.querySelector('[data-demo-reset]');
   const zoomEl = scope.querySelector('[data-demo-zoom]');
@@ -79,6 +85,7 @@ export function createPivotDemo(root = document, options = {}) {
   let scrollY = 0;
   let lastGeometry = null;
   let heatmapStyle = null;
+  const cornerLabels = createCornerLabels();
   const cleanups = [];
 
   const listen = (target, type, handler, listenerOptions) => {
@@ -123,7 +130,7 @@ export function createPivotDemo(root = document, options = {}) {
     if (!layout) return;
 
     const cellWidth = clampNumber(widthInput?.value, 40, 240, DEFAULT_CELL_WIDTH);
-    const { geometry, stats } = renderPivot(canvas, layout, {
+    const renderOptions = {
       viewport: {
         width: Math.max(320, getWidth()),
         height: Math.max(240, getHeight()),
@@ -135,7 +142,11 @@ export function createPivotDemo(root = document, options = {}) {
       cellStyle: getHeatmapCellStyle(),
       formatValue: (value) =>
         typeof value === 'number' ? value.toLocaleString('zh-CN') : String(value),
-    });
+    };
+
+    const { geometry, stats } = overlayInput?.checked
+      ? renderWithOverlay(canvas, layout, renderOptions, cornerLabels)
+      : renderPivot(canvas, layout, renderOptions);
 
     lastGeometry = geometry;
     scrollX = geometry.viewport.scrollX;
@@ -174,6 +185,7 @@ export function createPivotDemo(root = document, options = {}) {
     rebuildLayout();
   });
   listen(heatmapInput, 'change', render);
+  listen(overlayInput, 'change', render);
   listen(widthInput, 'input', render);
   listen(resetButton, 'click', () => {
     scrollX = 0;

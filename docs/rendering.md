@@ -132,6 +132,24 @@ x1 = ceil((scrollX + 数据视口宽) / cellW) − 1
 - 总格百万级或需要连续缩放：考虑 WebGL/WebGPU，并配合分层聚合。
 - 需要复制、读屏、打印：提供 DOM/SVG 版本或 DOM 镜像，而不是强行用 Canvas。
 
+## 自定义叠加渲染
+
+核心 `renderPivot` 不提供任意装饰回调；需要角标、参考线、选中框等叠加层时，
+用 `src/features/overlay.mjs`：
+
+```js
+import { renderWithOverlay, createCornerLabels } from './src/features/overlay.mjs';
+
+renderWithOverlay(canvas, layout, renderOptions, createCornerLabels());
+```
+
+`renderWithOverlay()` 先调用核心绘制，再把同一个 2D context（CSS 像素坐标，
+DPR 已处理）交给 `draw(ctx, { layout, geometry, theme, options })`。核心几何、
+绘制顺序和默认输出不变，overlay 永远在最上层；`draw` 抛错也会恢复 context。
+
+`createCornerLabels()` 只是内置示例：在冻结角区画行/列维度名，角区为空时跳过，
+过窄时省略号截断。实际业务可以直接写自己的 `draw`。
+
 ## 交互扩展
 
 命中测试可以直接复用模型：

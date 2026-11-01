@@ -1,6 +1,6 @@
 # 附加功能架构设计（设计稿）
 
-- **状态**：设计稿；并列度量、热力图 feature 已实现，核心旧热力图已移除；小计 / 总计、折叠 / 展开仍未实现。
+- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例已实现，核心旧热力图已移除；小计 / 总计、折叠 / 展开仍未实现。
 - **日期**：2026-10-31
 - **范围**：并列度量、热力图、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
 - **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
@@ -43,7 +43,7 @@
 
 ## 3. 目录规划
 
-第一个 feature（并列度量）和热力图 feature 已落地；其余目录在对应功能实现时再创建：
+并列度量、热力图和自定义叠加渲染示例已落地；其余目录在对应功能实现时再创建：
 
 ```
 src/
@@ -52,6 +52,7 @@ src/
   features/      附加业务能力
     dual-measure.mjs  已实现：并列度量布局
     heatmap.mjs       已实现：热力图渲染
+    overlay.mjs       已实现：自定义叠加渲染（角区示例）
     index.mjs         可选：feature 统一入口（尚未创建）
     subtotals.mjs     规划中
     collapse.mjs      规划中
@@ -88,6 +89,19 @@ renderer 的绘制路径。
 - 空值 / 非数值单元格返回 `undefined`，交回核心默认样式；
 - Demo 通过 `cellStyle` 使用 feature；核心 renderer 不再包含热力图选项；
 - 核心只保留 `cellStyle` / `formatValue` 这类通用扩展点。
+
+## 3.3 已实现：自定义叠加渲染（示例）
+
+`src/features/overlay.mjs` 在核心 `renderPivot` 结束后，把同一个 2D context
+交给调用方的 `draw` 回调，用于角标、参考线、图标、选中框等装饰。
+
+- `renderWithOverlay(target, layout, options, draw)`：通用入口，先核心、后自定义；
+- `createCornerLabels(options)`：内置示例，在冻结角区画行/列维度名；
+- 核心几何、绘制顺序和默认输出不变，overlay 始终位于最上层；
+- `draw` 使用与核心相同的 CSS 像素坐标系，DPR 变换已由核心处理；
+- 角区为空（纯行 / 纯列透视）时示例直接跳过，过窄时省略号截断；
+- feature 只读取 `layout` / `geometry`，不修改核心对象；
+- Demo 通过 `[data-demo-overlay]` 开关接入，关闭时仍走核心 `renderPivot`。
 
 ## 4. 依赖规则
 
