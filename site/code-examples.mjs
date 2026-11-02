@@ -143,7 +143,7 @@ renderWithOverlay(canvas, layout, {
     id: 'collapse',
     label: '展开/折叠',
     file: 'collapse.mjs',
-    note: '基于 aggregate 结果重新上卷；首版只支持 compact 单度量，cartesian、并列度量、行/列汇总暂不叠加。',
+    note: '基于 aggregate 结果重新上卷；可与行/列汇总同时使用；cartesian、并列度量暂不叠加。',
     code: `import { layoutPivot } from './src/model/index.mjs';
 import {
   collapseCube,

@@ -463,7 +463,13 @@ function assertMultiMeasureChain(actual, expected, axisName) {
  *   labels?: {
  *     subtotal?: string | ((value: unknown) => string),
  *     total?: string | (() => string)
- *   }
+ *   },
+ *   shouldIncludeSubtotal?: (context: {
+ *     axis: 'row' | 'col',
+ *     depth: number,
+ *     dimension: string,
+ *     path: Array<{ key: string, value: unknown }>
+ *   }) => boolean
  * }} options
  * @returns {ReturnType<import('../model/pivot-layout.mjs').layoutPivot>}
  */
@@ -477,8 +483,29 @@ export function withTotals(layout, rolled, options = {}) {
   assertChain(layout.axes?.col?.chain, rolled.col.chain, '列');
 
   const labels = { ...DEFAULT_TOTALS_LABELS, ...(options.labels ?? {}) };
-  const rowSlots = collectAxisSlots(layout.axes?.row, rolled.row, labels);
-  const colSlots = collectAxisSlots(layout.axes?.col, rolled.col, labels);
+  if (
+    options.shouldIncludeSubtotal !== undefined &&
+    typeof options.shouldIncludeSubtotal !== 'function'
+  ) {
+    throw new TypeError(
+      'withTotals: options.shouldIncludeSubtotal 必须是函数',
+    );
+  }
+  const shouldIncludeSubtotal = options.shouldIncludeSubtotal;
+  const rowSlots = collectAxisSlots(
+    layout.axes?.row,
+    rolled.row,
+    labels,
+    'row',
+    shouldIncludeSubtotal,
+  );
+  const colSlots = collectAxisSlots(
+    layout.axes?.col,
+    rolled.col,
+    labels,
+    'col',
+    shouldIncludeSubtotal,
+  );
   if (rowSlots.length === 0 && colSlots.length === 0) return layout;
 
   const newRows = layout.size.rows + rowSlots.length;
@@ -612,7 +639,13 @@ export function withTotals(layout, rolled, options = {}) {
  *   labels?: {
  *     subtotal?: string | ((value: unknown) => string),
  *     total?: string | (() => string)
- *   }
+ *   },
+ *   shouldIncludeSubtotal?: (context: {
+ *     axis: 'row' | 'col',
+ *     depth: number,
+ *     dimension: string,
+ *     path: Array<{ key: string, value: unknown }>
+ *   }) => boolean
  * }} options
  * @returns {ReturnType<import('../model/pivot-layout.mjs').layoutPivot>}
  */
@@ -628,7 +661,20 @@ export function withRowTotals(layout, rolled, options = {}) {
   assertChain(layout.axes.col?.chain, rolled.colChain, '列');
 
   const labels = { ...DEFAULT_TOTALS_LABELS, ...(options.labels ?? {}) };
-  const slots = collectSlots(layout, rolled, labels);
+  if (
+    options.shouldIncludeSubtotal !== undefined &&
+    typeof options.shouldIncludeSubtotal !== 'function'
+  ) {
+    throw new TypeError(
+      'withRowTotals: options.shouldIncludeSubtotal 必须是函数',
+    );
+  }
+  const slots = collectSlots(
+    layout,
+    rolled,
+    labels,
+    options.shouldIncludeSubtotal,
+  );
   if (slots.length === 0) return layout;
 
   const newRows = layout.size.rows + slots.length;
@@ -1039,11 +1085,23 @@ function skippedTotalsResult(cube, rowAxis, colAxis) {
 // 布局派生
 // ---------------------------------------------------------------------------
 
-function collectSlots(layout, rolled, labels) {
-  return collectAxisSlots(layout.axes.row, rolled, labels);
+function collectSlots(layout, rolled, labels, shouldIncludeSubtotal) {
+  return collectAxisSlots(
+    layout.axes.row,
+    rolled,
+    labels,
+    'row',
+    shouldIncludeSubtotal,
+  );
 }
 
-function collectAxisSlots(axisLayout, axisRolled, labels) {
+function collectAxisSlots(
+  axisLayout,
+  axisRolled,
+  labels,
+  axis,
+  shouldIncludeSubtotal,
+) {
   if (!axisLayout?.header) return [];
 
   const chain = axisLayout.chain ?? [];
@@ -1071,7 +1129,17 @@ function collectAxisSlots(axisLayout, axisRolled, labels) {
             label: subtotalLabel(member.value, labels.subtotal),
             kind: 'subtotal',
           };
-          slots.push(...expandMeasureSlot(baseSlot, axisRolled));
+          const includeSubtotal =
+            !shouldIncludeSubtotal ||
+            shouldIncludeSubtotal({
+              axis,
+              depth,
+              dimension,
+              path: baseSlot.path,
+            });
+          if (includeSubtotal) {
+            slots.push(...expandMeasureSlot(baseSlot, axisRolled));
+          }
         }
         if (member.children) walk(member.children, depth + 1, nextValues);
       }

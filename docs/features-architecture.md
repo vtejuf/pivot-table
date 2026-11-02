@@ -1,6 +1,6 @@
 # 附加功能架构设计（设计稿）
 
-- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、自定义 feature 示例（cell-marker）、行/列小计/总计（含双轴交叉与多度量分列）、悬浮滚动条、折叠 / 展开（compact 单度量首版）已实现，核心旧热力图已移除；跨层单格合并、cartesian / 多度量 / 汇总叠加的折叠仍未实现。
+- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、自定义 feature 示例（cell-marker）、行/列小计/总计（含双轴交叉与多度量分列）、悬浮滚动条、折叠 / 展开（compact 单度量，可与行/列汇总共存）已实现，核心旧热力图已移除；跨层单格合并、cartesian / 多度量的折叠仍未实现。
 - **日期**：2026-11-02
 - **范围**：并列度量、热力图、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
 - **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
@@ -124,7 +124,8 @@ renderer 的绘制路径。
   加权；可传纯函数 `reduce(records, context)` 覆盖。
 - 开关在 site 层翻译成配置；全关时 `skipped: true`，布局层原样返回。
 - 多度量时，列小计/总计按 measure 分列；行汇总行覆盖所有度量列。
-- 真正的跨层单格合并、表头样式和折叠联动后续。
+- 折叠联动：折叠父级跳过小计，总计保留；详见 3.7。
+- 真正的跨层单格合并、表头样式后续。
 - 行轴兼容入口 `rollupRowTotals()` / `withRowTotals()` 仍保留。
 - 设计与边界见 `docs/totals.md`。
 
@@ -170,8 +171,8 @@ renderer 的绘制路径。
 - `hitTestHeader(layout, geometry, point)`：命中行 / 列父表头，返回 `axis / dimension / value / key`；
 - `drawCollapseIndicators(ctx, { layout, geometry, collapsed })`：在父表头右侧画 + / −；
 - Demo“折叠模式”开启后点击父表头切换，关闭时清除状态并恢复完整布局；
-- 首版只支持 compact 单度量；cartesian、并列度量、行 / 列汇总与折叠暂不叠加；
-  Demo 开启折叠会自动关闭行 / 列汇总；
+- 首版只支持 compact 单度量；可与行 / 列汇总同时使用，折叠父级跳过小计、总计保留；
+  cartesian、并列度量暂不叠加；
 - 测试见 `test/features/collapse.test.mjs`；完整挂载点说明见
   [custom-features.md](custom-features.md#collapse)。
 
@@ -280,7 +281,7 @@ site / examples / bench
 ## 9. 未来落地顺序
 
 1. 小计 / 总计、折叠 / 展开基础版已实现，并在 `site/` 接入控件与状态。
-2. 扩展折叠：cartesian、并列度量、行 / 列汇总叠加。
+2. 扩展折叠：cartesian、并列度量。
 3. 真正的跨层单格合并。
 4. 继续补充文档、示例入口和架构守卫测试。
 

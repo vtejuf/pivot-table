@@ -239,7 +239,7 @@ const { geometry, stats } = renderPivot(canvas, result, {
   填充交叉格；支持指定维度、末尾汇总，核心模型与渲染器不改；
 - **展开/折叠 feature**：`collapseCube()` 按父成员重新上卷，`hitTestHeader()`
   命中父表头，`drawCollapseIndicators()` 绘制 +/−；首版支持 compact 单度量，
-  开启折叠会自动关闭行/列汇总，暂不与并列度量、cartesian 叠加；
+  可与行/列汇总同时使用；暂不与并列度量、cartesian 叠加；
 - 核心渲染器只保留 `cellStyle` / `formatValue` 接缝，不再包含热力图逻辑；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；
 - 传入 canvas 时按 DPR 设置物理像素，也可直接传 2D context；
@@ -314,8 +314,8 @@ node bench/depth-run.mjs --heap 1024
 - 左侧菜单：概览、数据流、矩阵算法、Demo、性能方案、快速开始；
 - 右侧内容包含算法推导、可交互 Canvas Demo 和方案对比；
 - Demo 控制器在 `site/demo.mjs`，主页与 `examples/canvas.html` 共用；
-- 控件通过 `data-demo-*` 属性接入，“行/列小计/总计”已接入；折叠 / 展开
-  仍预留扩展位。
+- 控件通过 `data-demo-*` 属性接入，“行/列小计/总计”和“折叠模式”已接入；
+  单度量下折叠可与行/列汇总同时使用，并列度量、cartesian 暂不可用。
 
 部署到 GitHub Pages：
 

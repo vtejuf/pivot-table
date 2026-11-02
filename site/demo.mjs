@@ -24,8 +24,8 @@
  * features/cell-marker.mjs 提供，cellStyle 上色 + overlay 画角标。
  *
  * 折叠模式由 features/collapse.mjs 接入：开启后点击行/列父表头折叠，
- * 关闭时清除状态并恢复完整布局。开启折叠会清掉行/列汇总选择，开启汇总
- * 会清掉折叠；并列度量、cartesian 无法表达折叠布局，控件会禁用。
+ * 关闭时清除状态并恢复完整布局。单度量下可与行/列汇总共存（折叠父级
+ * 跳过小计，总计保留）；并列度量、cartesian 无法表达折叠布局，控件会禁用。
  *
  * 滚动条始终启用：由 features/scrollbar.mjs 在核心绘制后叠加，无需控件。
  * 交互后显示，停止操作约 900ms 后淡出；悬停或拖动滚动条时固定显示。
@@ -55,6 +55,7 @@ import { createHeatmapStyle } from '../src/features/heatmap.mjs';
 import { createCellMarker } from '../src/features/cell-marker.mjs';
 import {
   collapseCube,
+  collapseKey,
   drawCollapseIndicators,
   hitTestHeader,
 } from '../src/features/collapse.mjs';
@@ -162,7 +163,7 @@ export function createPivotDemo(root = document, options = {}) {
     if (measureSelect) measureSelect.disabled = dual;
   }
 
-  function syncCollapseControl({ dual, totalsRequested, mode }) {
+  function syncCollapseControl({ dual, mode }) {
     if (!collapseInput) {
       collapseMode = false;
       collapsed.clear();
@@ -170,7 +171,7 @@ export function createPivotDemo(root = document, options = {}) {
     }
 
     // 并列度量和 cartesian 无法表达折叠后的布局，直接禁用。
-    // 行/列汇总不再禁用折叠：开启折叠会清掉汇总选择，开启汇总会清掉折叠。
+    // 单度量下折叠与行/列汇总可以共存。
     const unsupported = dual || mode === 'cartesian';
     collapseInput.disabled = unsupported;
 
@@ -183,24 +184,13 @@ export function createPivotDemo(root = document, options = {}) {
     }
 
     collapseMode = Boolean(collapseInput.checked);
-    if (totalsRequested && collapseMode) {
-      collapseInput.checked = false;
-      collapseMode = false;
-      collapsed.clear();
-      canvas.classList.remove('is-header-hover');
-    }
     if (!collapseMode) collapsed.clear();
   }
 
-  function clearTotalsSelection() {
-    for (const input of [
-      rowSubtotalInput,
-      rowTotalInput,
-      colSubtotalInput,
-      colTotalInput,
-    ]) {
-      if (input) input.checked = false;
-    }
+  function shouldIncludeSubtotal({ axis, path }) {
+    return !path.some((item) =>
+      collapsed.has(collapseKey(axis, item.key, item.value)),
+    );
   }
 
   function rebuildLayout(resetScroll = true) {
@@ -213,14 +203,13 @@ export function createPivotDemo(root = document, options = {}) {
     const totalsRequested =
       rowSubtotal || rowTotal || colSubtotal || colTotal;
 
-    syncCollapseControl({ dual, totalsRequested, mode });
+    syncCollapseControl({ dual, mode });
 
     const cube = dual ? dualCube : currentCube();
     const source =
       collapseMode &&
       collapsed.size > 0 &&
       !dual &&
-      !totalsRequested &&
       mode === 'compact'
         ? collapseCube(cube, collapsed)
         : cube;
@@ -233,7 +222,7 @@ export function createPivotDemo(root = document, options = {}) {
     totalsActive = false;
 
     if (!dual && totalsRequested) {
-      const rolled = rollupTotals(cube, {
+      const rolled = rollupTotals(source, {
         rows: {
           subtotals: rowSubtotal ? ['region'] : [],
           grandTotal: rowTotal,
@@ -243,7 +232,7 @@ export function createPivotDemo(root = document, options = {}) {
           grandTotal: colTotal,
         },
       });
-      layout = withTotals(base, rolled);
+      layout = withTotals(base, rolled, { shouldIncludeSubtotal });
       totalsActive = !rolled.skipped;
     } else if (dual && totalsRequested) {
       const rolled = rollupMultiTotals(
@@ -264,7 +253,7 @@ export function createPivotDemo(root = document, options = {}) {
           valueKey: dualCube.value,
         },
       );
-      layout = withTotals(base, rolled);
+      layout = withTotals(base, rolled, { shouldIncludeSubtotal });
       totalsActive = !rolled.skipped;
     } else {
       layout = base;
@@ -495,7 +484,6 @@ export function createPivotDemo(root = document, options = {}) {
   listen(heatmapInput, 'change', render);
   listen(markerInput, 'change', render);
   listen(collapseInput, 'change', () => {
-    if (collapseInput.checked) clearTotalsSelection();
     canvas.classList.remove('is-header-hover');
     rebuildLayout(false);
   });

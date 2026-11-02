@@ -9,6 +9,7 @@ import {
   drawCollapseIndicators,
   hitTestHeader,
 } from '../../src/features/collapse.mjs';
+import { rollupTotals, withTotals } from '../../src/features/totals.mjs';
 
 const dimensions = [
   { key: 'region', axis: 'row' },
@@ -134,6 +135,112 @@ test('折叠列成员时按列父级重新上卷', () => {
   const layout = makeLayout(result);
   assert.equal(layout.size.rows, 2);
   assert.equal(layout.size.cols, 2);
+});
+
+test('折叠与行/列汇总共存：跳过折叠父级小计，保留总计和交叉格', () => {
+  const gridDimensions = [
+    { key: 'region', axis: 'row' },
+    { key: 'city', axis: 'row', parent: 'region' },
+    { key: 'year', axis: 'col', order: 'asc' },
+    { key: 'product', axis: 'col', parent: 'year' },
+  ];
+  const gridRows = [
+    { region: 'east', city: 'hangzhou', year: 2023, product: 'phone', sales: 10 },
+    { region: 'east', city: 'hangzhou', year: 2024, product: 'phone', sales: 20 },
+    { region: 'east', city: 'shanghai', year: 2023, product: 'laptop', sales: 30 },
+    { region: 'west', city: 'chengdu', year: 2023, product: 'phone', sales: 40 },
+    { region: 'west', city: 'chengdu', year: 2024, product: 'phone', sales: 50 },
+  ];
+  const cube = aggregate(gridRows, {
+    dimensions: gridDimensions,
+    measure: { key: 'sales', aggregate: 'sum' },
+  });
+  const collapsed = new Set([
+    collapseKey('row', 'region', 'east'),
+    collapseKey('col', 'year', 2023),
+  ]);
+  const collapsedCube = collapseCube(cube, collapsed);
+  const base = layoutPivot(collapsedCube.rows, {
+    dimensions: collapsedCube.dimensions,
+    value: 'sales',
+    mode: 'compact',
+  });
+  const rolled = rollupTotals(collapsedCube, {
+    rows: { subtotals: ['region'], grandTotal: true },
+    cols: { subtotals: ['year'], grandTotal: true },
+  });
+  const display = withTotals(base, rolled, {
+    shouldIncludeSubtotal: ({ axis, path }) =>
+      !path.some((item) =>
+        collapsed.has(collapseKey(axis, item.key, item.value)),
+      ),
+  });
+
+  assert.equal(display.size.rows, 4); // east 占位 + west 明细 + west 小计 + 总计
+  assert.equal(display.size.cols, 4); // 2023 占位 + 2024 明细 + 2024 小计 + 总计
+
+  const rowHeader = display.axes.row.header;
+  const east = rowHeader.members.find((member) => member.value === 'east');
+  assert.deepEqual(
+    east.children.members.map((member) => member.value),
+    [COLLAPSED_VALUE],
+  );
+  const west = rowHeader.members.find((member) => member.value === 'west');
+  assert.ok(west.children.members.some((member) => member.value === 'west 小计'));
+  assert.ok(rowHeader.members.some((member) => member.value === '总计'));
+
+  const colHeader = display.axes.col.header;
+  const year2023 = colHeader.members.find((member) => member.value === 2023);
+  assert.deepEqual(
+    year2023.children.members.map((member) => member.value),
+    [COLLAPSED_VALUE],
+  );
+  const year2024 = colHeader.members.find((member) => member.value === 2024);
+  assert.ok(
+    year2024.children.members.some((member) => member.value === '2024 小计'),
+  );
+  assert.ok(colHeader.members.some((member) => member.value === '总计'));
+
+  const westSubtotal = west.children.members.find(
+    (member) => member.value === 'west 小计',
+  );
+  const year2024Subtotal = year2024.children.members.find(
+    (member) => member.value === '2024 小计',
+  );
+  assert.equal(
+    display.cellMap.get(
+      `${year2024Subtotal.offset},${westSubtotal.offset}`,
+    )?.value,
+    50,
+  );
+
+  const eastPlaceholder = east.children.members[0];
+  assert.equal(
+    display.cellMap.get(
+      `${year2024Subtotal.offset},${eastPlaceholder.offset}`,
+    )?.value,
+    20,
+  );
+  const year2023Placeholder = year2023.children.members[0];
+  const westCity = west.children.members.find(
+    (member) => member.value === 'chengdu',
+  );
+  assert.equal(
+    display.cellMap.get(
+      `${year2023Placeholder.offset},${westCity.offset}`,
+    )?.value,
+    40,
+  );
+
+  const { ctx } = createFakeContext();
+  assert.equal(
+    drawCollapseIndicators(ctx, {
+      layout: display,
+      geometry: computePivotGeometry(display),
+      collapsed,
+    }),
+    4,
+  );
 });
 
 test('avg 使用 __valueCount 加权上卷，空折叠状态返回原 rows', () => {

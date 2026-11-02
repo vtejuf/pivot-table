@@ -59,6 +59,7 @@ export function collapseKey(axis, dimension, value) {
  * @returns {{
  *   rows: Array<Record<string, unknown>>,
  *   dimensions: Array<object>,
+ *   measure: { key: string, aggregate: string },
  *   changed: boolean
  * }}
  */
@@ -68,7 +69,12 @@ export function collapseCube(cube, collapsed = new Set()) {
     throw new TypeError('collapseCube: collapsed 必须是 Set');
   }
   if (collapsed.size === 0) {
-    return { rows: cube.rows, dimensions: cube.dimensions, changed: false };
+    return {
+      rows: cube.rows,
+      dimensions: cube.dimensions,
+      measure: cube.measure,
+      changed: false,
+    };
   }
 
   const rowChain = axisChain(cube.dimensions, 'row');
@@ -125,7 +131,12 @@ export function collapseCube(cube, collapsed = new Set()) {
   }
 
   if (!changed) {
-    return { rows: cube.rows, dimensions: cube.dimensions, changed: false };
+    return {
+      rows: cube.rows,
+      dimensions: cube.dimensions,
+      measure: cube.measure,
+      changed: false,
+    };
   }
 
   const output = [];
@@ -144,7 +155,7 @@ export function collapseCube(cube, collapsed = new Set()) {
     output.push(result);
   }
 
-  return { rows: output, dimensions: cube.dimensions, changed: true };
+  return { rows: output, dimensions: cube.dimensions, measure: cube.measure, changed: true };
 }
 
 /**
@@ -358,8 +369,9 @@ function hitAxis(node, axis, clip, rectFn, point) {
 
       const hasChildren =
         member.children && (member.children.members?.length ?? 0) > 0;
+      const collapsible = hasChildren && !member.kind;
       if (containsRect(rect, point)) {
-        if (!hasChildren) return null;
+        if (!collapsible) return null;
         return {
           axis,
           dimension: current.key,
@@ -370,7 +382,7 @@ function hitAxis(node, axis, clip, rectFn, point) {
         };
       }
 
-      if (hasChildren) {
+      if (collapsible) {
         const hit = walk(member.children, depth + 1);
         if (hit) return hit;
       }
@@ -393,7 +405,8 @@ function drawAxisIndicators(
   for (const member of node.members ?? []) {
     const hasChildren =
       member.children && (member.children.members?.length ?? 0) > 0;
-    if (hasChildren) {
+    const collapsible = hasChildren && !member.kind;
+    if (collapsible) {
       const rect = rectFn(depth, member.offset, member.size);
       if (rectsIntersect(rect, clip)) {
         const isCollapsed = collapsed.has(
