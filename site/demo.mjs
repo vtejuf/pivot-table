@@ -24,8 +24,8 @@
  * features/cell-marker.mjs 提供，cellStyle 上色 + overlay 画角标。
  *
  * 折叠模式由 features/collapse.mjs 接入：开启后点击行/列父表头折叠，
- * 关闭时清除状态并恢复完整布局。首版只支持 compact 单度量，与并列度量、
- * 行/列汇总、cartesian 互斥（控件会自动禁用并清除折叠状态）。
+ * 关闭时清除状态并恢复完整布局。开启折叠会清掉行/列汇总选择，开启汇总
+ * 会清掉折叠；并列度量、cartesian 无法表达折叠布局，控件会禁用。
  *
  * 滚动条始终启用：由 features/scrollbar.mjs 在核心绘制后叠加，无需控件。
  * 交互后显示，停止操作约 900ms 后淡出；悬停或拖动滚动条时固定显示。
@@ -169,7 +169,9 @@ export function createPivotDemo(root = document, options = {}) {
       return;
     }
 
-    const unsupported = dual || totalsRequested || mode === 'cartesian';
+    // 并列度量和 cartesian 无法表达折叠后的布局，直接禁用。
+    // 行/列汇总不再禁用折叠：开启折叠会清掉汇总选择，开启汇总会清掉折叠。
+    const unsupported = dual || mode === 'cartesian';
     collapseInput.disabled = unsupported;
 
     if (unsupported) {
@@ -181,7 +183,24 @@ export function createPivotDemo(root = document, options = {}) {
     }
 
     collapseMode = Boolean(collapseInput.checked);
+    if (totalsRequested && collapseMode) {
+      collapseInput.checked = false;
+      collapseMode = false;
+      collapsed.clear();
+      canvas.classList.remove('is-header-hover');
+    }
     if (!collapseMode) collapsed.clear();
+  }
+
+  function clearTotalsSelection() {
+    for (const input of [
+      rowSubtotalInput,
+      rowTotalInput,
+      colSubtotalInput,
+      colTotalInput,
+    ]) {
+      if (input) input.checked = false;
+    }
   }
 
   function rebuildLayout(resetScroll = true) {
@@ -476,6 +495,7 @@ export function createPivotDemo(root = document, options = {}) {
   listen(heatmapInput, 'change', render);
   listen(markerInput, 'change', render);
   listen(collapseInput, 'change', () => {
+    if (collapseInput.checked) clearTotalsSelection();
     canvas.classList.remove('is-header-hover');
     rebuildLayout(false);
   });

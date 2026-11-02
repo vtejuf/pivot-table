@@ -125,6 +125,7 @@ const layout = layoutPivot(next.rows, {
 ```
 
 - 首版只支持 compact 单度量；cartesian、并列度量、行/列汇总暂不叠加；
+  Demo 开启折叠会自动关闭行/列汇总；
 - 被折叠父成员的子维度显示为 `（全部）`，表示该父级的汇总；
 - 父表头命中用 `hitTestHeader()`，指示器用 `drawCollapseIndicators()`；
 - 折叠键用 `collapseKey(axis, dimension, value)` 生成，存进 Set 即可切换。

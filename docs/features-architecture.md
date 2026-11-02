@@ -171,6 +171,7 @@ renderer 的绘制路径。
 - `drawCollapseIndicators(ctx, { layout, geometry, collapsed })`：在父表头右侧画 + / −；
 - Demo“折叠模式”开启后点击父表头切换，关闭时清除状态并恢复完整布局；
 - 首版只支持 compact 单度量；cartesian、并列度量、行 / 列汇总与折叠暂不叠加；
+  Demo 开启折叠会自动关闭行 / 列汇总；
 - 测试见 `test/features/collapse.test.mjs`；完整挂载点说明见
   [custom-features.md](custom-features.md#collapse)。
 

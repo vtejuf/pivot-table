@@ -239,7 +239,7 @@ const { geometry, stats } = renderPivot(canvas, result, {
   填充交叉格；支持指定维度、末尾汇总，核心模型与渲染器不改；
 - **展开/折叠 feature**：`collapseCube()` 按父成员重新上卷，`hitTestHeader()`
   命中父表头，`drawCollapseIndicators()` 绘制 +/−；首版支持 compact 单度量，
-  暂不与并列度量、cartesian、行/列汇总叠加；
+  开启折叠会自动关闭行/列汇总，暂不与并列度量、cartesian 叠加；
 - 核心渲染器只保留 `cellStyle` / `formatValue` 接缝，不再包含热力图逻辑；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；
 - 传入 canvas 时按 DPR 设置物理像素，也可直接传 2D context；

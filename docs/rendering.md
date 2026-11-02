@@ -212,7 +212,7 @@ const next = scrollFromThumbPosition(hit.bar, y, grabOffset);
 - `drawCollapseIndicators(ctx, { layout, geometry, collapsed })`：在父表头右侧
   画 + / − 指示器；
 - 首版只支持 compact 单度量，暂不与并列度量、行 / 列汇总叠加；cartesian 会
-  为每个父级补齐全局子成员，因此也不支持；
+  为每个父级补齐全局子成员，因此也不支持；Demo 开启折叠会自动关闭行 / 列汇总；
 - Demo 通过“折叠模式”开关接入，关闭时清除状态并恢复完整布局；
 - 完整挂载点说明见 [custom-features.md](custom-features.md#collapse)。
 
