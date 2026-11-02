@@ -144,6 +144,10 @@
       #pivot.is-dragging {
         cursor: grabbing;
       }
+      #pivot.is-scrollbar-hover,
+      #pivot.is-scrollbar-dragging {
+        cursor: default;
+      }
       #pivot:focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: -2px;
@@ -276,7 +280,7 @@
           id="pivot"
           data-demo-canvas
           tabindex="0"
-          aria-label="透视表 Canvas 示例：滚轮、拖拽或方向键平移"
+          aria-label="透视表 Canvas 示例：滚轮、拖拽、滚动条或方向键平移"
         ></canvas>
 
         <div class="status">
@@ -290,8 +294,9 @@
       <p class="hint">
         需要通过 HTTP 打开：<code>python3 -m http.server 8000</code>，然后访问
         <code>http://localhost:8000/examples/canvas.html</code>。滚轮 / 拖拽 /
-        方向键平移，表头冻结。并列度量时，热力图和行/列汇总都按 measure 分列。
-        角区标签开关演示自定义叠加层；行/列小计与总计分别在 region、year 维度末尾插入汇总。
+        滚动条 / 方向键平移，表头冻结。并列度量时，热力图和行/列汇总都按 measure
+        分列。角区标签开关演示自定义叠加层；行/列小计与总计分别在 region、year
+        维度末尾插入汇总。
       </p>
     </main>
 

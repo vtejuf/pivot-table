@@ -150,6 +150,35 @@ DPR 已处理）交给 `draw(ctx, { layout, geometry, theme, options })`。核�
 `createCornerLabels()` 只是内置示例：在冻结角区画行/列维度名，角区为空时跳过，
 过窄时省略号截断。实际业务可以直接写自己的 `draw`。
 
+## 滚动条 feature
+
+`src/features/scrollbar.mjs` 在核心绘制后叠加悬浮滚动条，核心几何、可见范围
+和默认绘制顺序都不变：
+
+```js
+import { createScrollbarOverlay, scrollFromThumbPosition } from './src/features/scrollbar.mjs';
+import { renderWithOverlay } from './src/features/overlay.mjs';
+
+const scrollbars = createScrollbarOverlay();
+renderWithOverlay(canvas, layout, options, scrollbars.draw);
+
+const hit = scrollbars.hitTest(x, y); // { axis, part, bar } | null
+const next = scrollFromThumbPosition(hit.bar, y, grabOffset);
+```
+
+- 轨道从 `dataOrigin` 开始，避开冻结的列表头 / 行表头；两个方向都可滚动时，
+  右下角留出交叉空隙；
+- thumb 长度按 `dataViewport / dataSize` 计算，并限制最小可抓取长度；
+  `canScrollX / canScrollY` 为 false 时整条滚动条自动隐藏；
+- `hitTest` 区分 thumb / track；点击轨道时用 `thumbLength / 2` 作为
+  `grabOffset`，thumb 中心会跳到点击位置；
+- `drawScrollbars()` 接受 `{ hover, active }` 状态，用不同颜色表达悬停和拖动；
+- 覆盖式绘制会占用视口右缘 / 下缘约 13px，不修改核心 `dataClip`、`visible`
+  或布局对象。
+
+`site/demo.mjs` 已经接入：指针命中滚动条时优先拖动滚动条，其余区域继续拖拽
+平移；滚轮、方向键和滚动条最终都写回 `scrollX / scrollY`。
+
 ## 行 / 列小计与总计布局
 
 `src/features/totals.mjs` 在核心布局之外派生展示布局：`rollupTotals()` /
@@ -184,7 +213,8 @@ Canvas 内容对辅助技术不可见。生产环境建议同时提供语义化�
 ## 当前限制
 
 - 每个轴只支持一条层级链，表头是规则的嵌套结构。
-- 没有内置滚动条；示例用滚轮和拖拽更新 `scrollX / scrollY`。
+- 核心不内置滚动条；由 `src/features/scrollbar.mjs` 在核心绘制后叠加，
+  示例使用滚动条、滚轮和拖拽更新 `scrollX / scrollY`。
 - 没有列宽自适应，列宽由 `cellSize.width` 统一指定。
 - `cellStyle` / `formatValue` 是同步回调，逐格调用；大表上应保持轻量。
 - compact 模式没有全局固定矩阵，但渲染只依赖表头的 `offset / size`，
@@ -206,4 +236,5 @@ node --test test/model/*.test.mjs test/render/*.test.mjs \
 - 传 canvas 时按 DPR 设置物理尺寸。
 
 热力图颜色、浅色/深色文字和双度量分范围由 `test/features/heatmap.test.mjs`
-覆盖。
+覆盖。滚动条几何、thumb 映射、命中测试和 hover / active 绘制由
+`test/features/scrollbar.test.mjs` 覆盖。

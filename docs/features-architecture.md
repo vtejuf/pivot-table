@@ -1,6 +1,6 @@
 # 附加功能架构设计（设计稿）
 
-- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、行/列小计/总计（含双轴交叉与多度量分列）已实现，核心旧热力图已移除；真正的跨层单格合并、折叠 / 展开仍未实现。
+- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、行/列小计/总计（含双轴交叉与多度量分列）、悬浮滚动条已实现，核心旧热力图已移除；真正的跨层单格合并、折叠 / 展开仍未实现。
 - **日期**：2026-10-31
 - **范围**：并列度量、热力图、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
 - **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
@@ -53,6 +53,7 @@ src/
     dual-measure.mjs  已实现：并列度量布局
     heatmap.mjs       已实现：热力图渲染
     overlay.mjs       已实现：自定义叠加渲染（角区示例）
+    scrollbar.mjs     已实现：悬浮滚动条（绘制 + 命中测试 + 拖拽换算）
     totals.mjs        已实现：行/列小计/总计（含双轴交叉）
     index.mjs         可选：feature 统一入口（尚未创建）
     subtotals.mjs     规划中
@@ -61,6 +62,7 @@ test/
   features/
     dual-measure.test.mjs  已实现
     heatmap.test.mjs       已实现
+    scrollbar.test.mjs     已实现
     subtotals.test.mjs     规划中
     collapse.test.mjs      规划中
   architecture.test.mjs    已实现：依赖方向守卫
@@ -125,6 +127,22 @@ renderer 的绘制路径。
 - 真正的跨层单格合并、表头样式和折叠联动后续。
 - 行轴兼容入口 `rollupRowTotals()` / `withRowTotals()` 仍保留。
 - 设计与边界见 `docs/totals.md`。
+
+## 3.5 已实现：悬浮滚动条
+
+`src/features/scrollbar.mjs` 在核心绘制后叠加滚动条，不修改核心几何与布局：
+
+- `computeScrollbarGeometry(geometry, options)`：根据核心 `viewport /
+  dataOrigin / dataSize / dataViewport` 计算两条轨道和 thumb；
+- `hitTestScrollbars(bars, x, y)`：区分 thumb / track，轨道外返回 `null`；
+- `scrollFromThumbPosition(bar, pointer, grabOffset)`：把指针位置换算回滚动偏移；
+- `drawScrollbars(ctx, geometry, options, state)`：绘制轨道和 thumb，支持
+  hover / active 颜色；
+- `createScrollbarOverlay(options)`：封装成 overlay 的 draw 函数，并缓存最近一次
+  几何供站点层命中测试；
+- 轨道从数据区起点开始，避开冻结表头；两个方向都可滚动时右下角留空；内容
+  不足一个视口时自动隐藏；
+- Demo 始终启用；指针命中滚动条时优先拖动滚动条，否则继续拖拽平移。
 
 ## 4. 依赖规则
 

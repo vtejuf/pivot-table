@@ -20,6 +20,10 @@
  * 并列度量只负责布局数据：度量作为列轴最末层维度。热力图由 feature 通过
  * cellStyle 提供；双度量时按 measure 分别计算色阶。
  *
+ * 滚动条始终启用：由 features/scrollbar.mjs 在核心绘制后叠加，无需控件。
+ * 指针命中滚动条时优先拖动滚动条，其余区域继续拖拽平移；滚轮、方向键和
+ * 滚动条最终都写回 scrollX / scrollY，然后统一重绘。
+ *
  * 行/列小计、总计由 features/totals.mjs 接入：单度量用 rollupTotals()，
  * 并列度量用 rollupMultiTotals() 按 measure 分列上卷，再由 withTotals() 派生。
  *
@@ -29,11 +33,14 @@
  */
 
 import { layoutPivot } from '../src/model/index.mjs';
-import { renderPivot } from '../src/render/index.mjs';
 import {
   createCornerLabels,
   renderWithOverlay,
 } from '../src/features/overlay.mjs';
+import {
+  createScrollbarOverlay,
+  scrollFromThumbPosition,
+} from '../src/features/scrollbar.mjs';
 import { combineMeasures } from '../src/features/dual-measure.mjs';
 import { createHeatmapStyle } from '../src/features/heatmap.mjs';
 import {
@@ -102,7 +109,9 @@ export function createPivotDemo(root = document, options = {}) {
   let heatmapStyle = null;
   let heatmapCellStyle = null;
   let totalsActive = false;
+  let hoverAxis = null;
   const cornerLabels = createCornerLabels();
+  const scrollbarOverlay = createScrollbarOverlay();
   const cleanups = [];
 
   const listen = (target, type, handler, listenerOptions) => {
@@ -214,13 +223,34 @@ export function createPivotDemo(root = document, options = {}) {
         typeof value === 'number' ? value.toLocaleString('zh-CN') : String(value),
     };
 
-    const { geometry, stats } = overlayInput?.checked
-      ? renderWithOverlay(canvas, layout, renderOptions, cornerLabels)
-      : renderPivot(canvas, layout, renderOptions);
+    const drawOverlays = (ctx, context) => {
+      if (overlayInput?.checked) cornerLabels(ctx, context);
+      scrollbarOverlay.draw(ctx, context);
+    };
+
+    const { geometry, stats } = renderWithOverlay(
+      canvas,
+      layout,
+      renderOptions,
+      drawOverlays,
+    );
 
     lastGeometry = geometry;
     scrollX = geometry.viewport.scrollX;
     scrollY = geometry.viewport.scrollY;
+
+    // 布局 / 视口变化后滚动条可能消失，清掉残留的 hover 状态。
+    if (hoverAxis) {
+      const bars = scrollbarOverlay.getGeometry(geometry);
+      const stillVisible =
+        hoverAxis === 'y' ? bars?.vertical.visible : bars?.horizontal.visible;
+      if (!stillVisible) {
+        hoverAxis = null;
+        scrollbarOverlay.setHover(null);
+        canvas.classList.remove('is-scrollbar-hover');
+      }
+    }
+
     updateStatus(cellWidth, stats);
   }
 
@@ -283,9 +313,81 @@ export function createPivotDemo(root = document, options = {}) {
     { passive: false },
   );
 
+  function canvasPoint(event) {
+    const rect =
+      typeof canvas.getBoundingClientRect === 'function'
+        ? canvas.getBoundingClientRect()
+        : null;
+    const viewport = lastGeometry?.viewport;
+    if (rect && viewport && rect.width > 0 && rect.height > 0) {
+      return {
+        x: ((event.clientX - rect.left) / rect.width) * viewport.width,
+        y: ((event.clientY - rect.top) / rect.height) * viewport.height,
+      };
+    }
+    return { x: event.offsetX ?? 0, y: event.offsetY ?? 0 };
+  }
+
+  function applyScrollbarDrag(point) {
+    if (!scrollbarDrag || !lastGeometry) return;
+
+    const bars = scrollbarOverlay.getGeometry(lastGeometry);
+    const bar = scrollbarDrag.axis === 'y' ? bars?.vertical : bars?.horizontal;
+    if (!bar?.visible) return;
+
+    const position = scrollbarDrag.axis === 'y' ? point.y : point.x;
+    const next = scrollFromThumbPosition(
+      bar,
+      position,
+      scrollbarDrag.grabOffset,
+    );
+    if (scrollbarDrag.axis === 'y') scrollY = next;
+    else scrollX = next;
+    render();
+  }
+
+  function updateScrollbarHover(point) {
+    const hit = lastGeometry
+      ? scrollbarOverlay.hitTest(point.x, point.y, lastGeometry)
+      : null;
+    const axis = hit?.axis ?? null;
+    if (axis === hoverAxis) return;
+
+    hoverAxis = axis;
+    scrollbarOverlay.setHover(axis);
+    canvas.classList.toggle('is-scrollbar-hover', Boolean(axis));
+    render();
+  }
+
   let drag = null;
+  let scrollbarDrag = null;
+
   listen(canvas, 'pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+    const point = canvasPoint(event);
+    const hit = lastGeometry
+      ? scrollbarOverlay.hitTest(point.x, point.y, lastGeometry)
+      : null;
+
+    if (hit) {
+      const thumbStart = hit.axis === 'y' ? hit.bar.thumb.y : hit.bar.thumb.x;
+      scrollbarDrag = {
+        pointerId: event.pointerId,
+        axis: hit.axis,
+        grabOffset:
+          hit.part === 'thumb'
+            ? (hit.axis === 'y' ? point.y : point.x) - thumbStart
+            : hit.bar.thumbLength / 2,
+      };
+      scrollbarOverlay.setActive(hit.axis);
+      canvas.classList.add('is-scrollbar-dragging');
+      canvas.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+      if (hit.part === 'track') applyScrollbarDrag(point);
+      return;
+    }
+
     drag = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -298,16 +400,48 @@ export function createPivotDemo(root = document, options = {}) {
   });
 
   listen(canvas, 'pointermove', (event) => {
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    scrollX = drag.scrollX - (event.clientX - drag.startX);
-    scrollY = drag.scrollY - (event.clientY - drag.startY);
+    if (scrollbarDrag && scrollbarDrag.pointerId === event.pointerId) {
+      applyScrollbarDrag(canvasPoint(event));
+      return;
+    }
+
+    if (drag) {
+      if (drag.pointerId !== event.pointerId) return;
+      scrollX = drag.scrollX - (event.clientX - drag.startX);
+      scrollY = drag.scrollY - (event.clientY - drag.startY);
+      render();
+      return;
+    }
+
+    if (event.pointerType !== 'touch') {
+      updateScrollbarHover(canvasPoint(event));
+    }
+  });
+
+  listen(canvas, 'pointerleave', () => {
+    if (scrollbarDrag || hoverAxis === null) return;
+    hoverAxis = null;
+    scrollbarOverlay.setHover(null);
+    canvas.classList.remove('is-scrollbar-hover');
     render();
   });
 
   const endDrag = (event) => {
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    drag = null;
-    canvas.classList.remove('is-dragging');
+    const endsScrollbar =
+      scrollbarDrag !== null && scrollbarDrag.pointerId === event.pointerId;
+    const endsPan = drag !== null && drag.pointerId === event.pointerId;
+    if (!endsScrollbar && !endsPan) return;
+
+    if (endsScrollbar) {
+      scrollbarDrag = null;
+      scrollbarOverlay.setActive(null);
+      canvas.classList.remove('is-scrollbar-dragging');
+      render();
+    }
+    if (endsPan) {
+      drag = null;
+      canvas.classList.remove('is-dragging');
+    }
     if (canvas.hasPointerCapture?.(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId);
     }

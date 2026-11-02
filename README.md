@@ -33,6 +33,7 @@ src/
     dual-measure.mjs   并列度量：度量作为最末列维度（附加功能）
     heatmap.mjs        热力图：通过 cellStyle 渲染，按 measure 分组色阶
     overlay.mjs        自定义叠加：核心绘制后追加装饰（附角区示例）
+    scrollbar.mjs      悬浮滚动条：轨道 / thumb 绘制 + 命中测试 + 拖拽换算
     totals.mjs         行/列小计/总计：统一上卷 + 双轴展示布局（支持多度量）
 site/
   main.mjs             主页导航与 Demo 初始化
@@ -45,6 +46,7 @@ test/
     dual-measure.test.mjs  并列度量测试
     heatmap.test.mjs       热力图测试
     overlay.test.mjs       自定义叠加与角区示例测试
+    scrollbar.test.mjs     悬浮滚动条几何、命中测试与拖拽换算
     totals.test.mjs        行/列小计/总计与多度量测试
   architecture.test.mjs    核心不反向依赖 features
 examples/
@@ -211,6 +213,8 @@ const { geometry, stats } = renderPivot(canvas, result, {
 渲染能力：
 
 - 多层行 / 列表头，滚动时冻结在视口边缘；
+- **滚动条 feature**：`createScrollbarOverlay()` 在核心绘制后叠加悬浮滚动条，
+  提供 thumb 命中测试与拖拽换算；轨道避开冻结表头，内容不足时自动隐藏；
 - 视口虚拟化，只遍历并绘制可见单元格，网格线批量描边；
 - **并列度量**：feature 层把度量作为列轴最末维度，Demo 扩展位可开关；
 - **热力图 feature**：通过 `cellStyle` 渲染；单度量共用一个范围，双度量按

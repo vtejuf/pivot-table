@@ -781,6 +781,11 @@ select:disabled {
   cursor: grabbing;
 }
 
+.demo-stage canvas.is-scrollbar-hover,
+.demo-stage canvas.is-scrollbar-dragging {
+  cursor: default;
+}
+
 .demo-status {
   display: flex;
   flex-wrap: wrap;
