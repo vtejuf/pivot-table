@@ -124,40 +124,166 @@
         <section id="pipeline" class="section">
           <header class="section__head">
             <p class="eyebrow">02 · pipeline</p>
-            <h2>两个业务，一条数据流</h2>
+            <h2>一条核心数据流，一组扩展挂载点</h2>
             <p>
-              聚合层不读取行列配置，布局层不做 sum / avg / count，渲染层只消费布局结果。
-              每一层都可以单独替换。
+              聚合、布局、几何、渲染各自独立；内置 feature 挂在阶段之间或渲染之后，
+              新增能力也复用同一组挂载点。
             </p>
           </header>
 
-          <div class="pipeline">
-            <article class="card pipeline__step">
-              <span class="step__index">01</span>
-              <h3>聚合</h3>
-              <p>按维度 key 分组，每个维度组合只保留一行，并计算 count / sum / avg / min / max。</p>
-              <code>aggregate(rows, { dimensions, measure })</code>
-            </article>
-            <article class="card pipeline__step">
-              <span class="step__index">02</span>
-              <h3>布局</h3>
-              <p>把成员取值编码成序号，通过仿射矩阵得到整数网格坐标，并生成可递归渲染的表头。</p>
-              <code>layoutPivot(cube.rows, { dimensions, value })</code>
-            </article>
-            <article class="card pipeline__step">
-              <span class="step__index">03</span>
-              <h3>渲染</h3>
-              <p>根据滚动位置计算可见范围与屏幕矩形，只绘制视口内的格子、文本和冻结表头。</p>
-              <code>renderPivot(canvas, layout, options)</code>
-            </article>
+          <div class="flow">
+            <div class="flow__legend" aria-label="数据流图例">
+              <span class="flow__legend-item flow__legend-item--core">
+                <i aria-hidden="true"></i>核心阶段
+              </span>
+              <span class="flow__legend-item flow__legend-item--feature">
+                <i aria-hidden="true"></i>内置 feature
+              </span>
+              <span class="flow__legend-item flow__legend-item--extension">
+                <i aria-hidden="true"></i>可挂载扩展点
+              </span>
+            </div>
+
+            <ol class="flow__list">
+              <li class="flow__stage">
+                <article class="flow__core">
+                  <span class="flow__index">01</span>
+                  <div class="flow__body">
+                    <div class="flow__head">
+                      <h3>明细 rows</h3>
+                      <span class="flow__kind">输入</span>
+                    </div>
+                    <p>业务明细，尚未聚合。每一行是一条原始记录。</p>
+                    <div class="flow__io">
+                      <code>rows[]</code><span aria-hidden="true">→</span><code>rows[]</code>
+                    </div>
+                  </div>
+                </article>
+                <div class="flow__mounts">
+                  <span class="flow__mount-label">挂载点</span>
+                  <span class="flow__chip flow__chip--extension">
+                    <strong>过滤 / 排序 / 折叠</strong>· 预处理（规划中）
+                  </span>
+                </div>
+              </li>
+
+              <li class="flow__stage">
+                <article class="flow__core">
+                  <span class="flow__index">02</span>
+                  <div class="flow__body">
+                    <div class="flow__head">
+                      <h3>aggregate</h3>
+                      <span class="flow__kind">聚合</span>
+                    </div>
+                    <p>按维度 key 分组，每个维度组合只保留一行，计算 count / sum / avg / min / max。</p>
+                    <div class="flow__io">
+                      <code>rows[]</code><span aria-hidden="true">→</span><code>cube.rows[]</code>
+                    </div>
+                  </div>
+                </article>
+                <div class="flow__mounts">
+                  <span class="flow__mount-label">挂载点</span>
+                  <span class="flow__chip flow__chip--feature">
+                    <strong>dual-measure</strong>· combineMeasures()
+                  </span>
+                  <span class="flow__chip flow__chip--extension">
+                    <strong>自定义度量 / 上卷</strong>· 派生 cube
+                  </span>
+                </div>
+              </li>
+
+              <li class="flow__stage">
+                <article class="flow__core">
+                  <span class="flow__index">03</span>
+                  <div class="flow__body">
+                    <div class="flow__head">
+                      <h3>layoutPivot</h3>
+                      <span class="flow__kind">布局</span>
+                    </div>
+                    <p>把成员取值编码成序号，通过仿射矩阵得到整数网格坐标，并生成可递归渲染的表头。</p>
+                    <div class="flow__io">
+                      <code>cube.rows[]</code><span aria-hidden="true">→</span><code>layout</code>
+                    </div>
+                  </div>
+                </article>
+                <div class="flow__mounts">
+                  <span class="flow__mount-label">挂载点</span>
+                  <span class="flow__chip flow__chip--feature">
+                    <strong>totals</strong>· rollupTotals(cube) + withTotals(layout)
+                  </span>
+                  <span class="flow__chip flow__chip--extension">
+                    <strong>展示布局派生</strong>· 排序 / 合并 / 折叠
+                  </span>
+                </div>
+              </li>
+
+              <li class="flow__stage">
+                <article class="flow__core">
+                  <span class="flow__index">04</span>
+                  <div class="flow__body">
+                    <div class="flow__head">
+                      <h3>computePivotGeometry</h3>
+                      <span class="flow__kind">几何</span>
+                    </div>
+                    <p>根据视口和滚动偏移计算屏幕矩形、可见范围与裁剪区；不接触 Canvas。</p>
+                    <div class="flow__io">
+                      <code>layout</code><span aria-hidden="true">→</span><code>geometry</code>
+                    </div>
+                  </div>
+                </article>
+                <div class="flow__mounts">
+                  <span class="flow__mount-label">挂载点</span>
+                  <span class="flow__chip flow__chip--extension">
+                    <strong>viewport / overscan</strong>· 表头尺寸
+                  </span>
+                </div>
+              </li>
+
+              <li class="flow__stage">
+                <article class="flow__core">
+                  <span class="flow__index">05</span>
+                  <div class="flow__body">
+                    <div class="flow__head">
+                      <h3>renderPivot</h3>
+                      <span class="flow__kind">渲染</span>
+                    </div>
+                    <p>绘制背景、网格线、文本和冻结表头；只遍历视口内的格子。</p>
+                    <div class="flow__io">
+                      <code>layout + geometry</code><span aria-hidden="true">→</span><code>Canvas</code>
+                    </div>
+                  </div>
+                </article>
+                <div class="flow__mounts">
+                  <span class="flow__mount-label">挂载点</span>
+                  <span class="flow__chip flow__chip--feature">
+                    <strong>heatmap</strong>· cellStyle
+                  </span>
+                  <span class="flow__chip flow__chip--feature">
+                    <strong>overlay</strong>· renderWithOverlay()
+                  </span>
+                  <span class="flow__chip flow__chip--feature">
+                    <strong>scrollbar</strong>· 渲染后叠加 + 自动隐藏
+                  </span>
+                  <span class="flow__chip flow__chip--extension">
+                    <strong>formatValue / theme</strong>· 渲染配置
+                  </span>
+                </div>
+              </li>
+            </ol>
+
+            <div class="flow__loop">
+              <span class="flow__loop-label">交互回路</span>
+              <span><code>scrollX / scrollY</code> 变化 → 重新计算几何 → 重绘</span>
+              <span>命中测试 / 下钻 → 重新进入 <code>aggregate</code> 或 <code>layoutPivot</code></span>
+            </div>
           </div>
 
           <div class="callout">
             <div class="callout__icon" aria-hidden="true">→</div>
             <div>
-              <strong>布局输出的是纯数据。</strong>
-              每个单元格带 <code>vector: [x, y]</code>，同时提供 <code>cellMap</code>
-              哈希索引。渲染器、命中测试和导出都复用同一份布局。
+              <strong>核心不依赖 feature。</strong>
+              依赖方向始终是 site / features → model / render；feature 只读取核心输出，
+              通过上面的挂载点扩展。架构守卫测试会阻止核心反向 import features。
             </div>
           </div>
         </section>

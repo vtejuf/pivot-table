@@ -424,12 +424,6 @@ canvas:focus-visible {
 /* Pipeline                                                                   */
 /* ------------------------------------------------------------------------- */
 
-.pipeline {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -437,44 +431,263 @@ canvas:focus-visible {
   padding: 24px;
 }
 
-.pipeline__step {
+.flow {
+  --flow-pad: 20px;
+  --flow-index: 46px;
+  --flow-indent: 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.flow__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.flow__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.flow__legend-item i {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.flow__legend-item--core i {
+  border-color: #0f172a;
+  background: #0f172a;
+}
+
+.flow__legend-item--feature i {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.flow__legend-item--extension i {
+  border-style: dashed;
+  background: #fff;
+}
+
+.flow__list {
   position: relative;
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0 0 0 var(--flow-indent);
+  list-style: none;
+}
+
+.flow__list::before {
+  content: "";
+  position: absolute;
+  top: 26px;
+  bottom: 26px;
+  left: 8px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #bfdbfe, #e2e8f0);
+}
+
+.flow__stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(270px, 0.8fr);
+  gap: 14px 20px;
+  align-items: stretch;
+}
+
+.flow__core {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--flow-index) minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 18px var(--flow-pad);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.04);
   transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease;
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
-.pipeline__step:hover {
+.flow__core:hover {
   border-color: #bfdbfe;
-  transform: translateY(-2px);
-  box-shadow: 0 16px 36px rgb(15 23 42 / 0.07);
+  box-shadow: 0 14px 32px rgb(15 23 42 / 0.07);
 }
 
-.step__index {
-  display: inline-block;
-  margin-bottom: 18px;
-  color: var(--accent);
+.flow__index {
+  display: grid;
+  place-items: center;
+  width: var(--flow-index);
+  height: var(--flow-index);
+  border-radius: 12px;
+  background: #0f172a;
+  color: #fff;
   font-family: var(--mono);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
 }
 
-.pipeline__step p {
-  margin: 0 0 16px;
+.flow__body {
+  min-width: 0;
+}
+
+.flow__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.flow__head h3 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.flow__kind {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f8fafc;
+  padding: 2px 8px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.flow__body p {
+  margin: 8px 0 12px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.flow__io {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.flow__io code {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 3px 7px;
+  color: #334155;
+  font-size: 11px;
+}
+
+.flow__mounts {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+  border-left: 1px dashed var(--line-strong);
+  padding: 2px 0 2px 16px;
+}
+
+.flow__mount-label {
+  width: 100%;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.flow__chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.flow__chip::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.flow__chip strong {
+  color: inherit;
+  font-weight: 600;
+}
+
+.flow__chip--feature {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.flow__chip--feature::before {
+  background: currentColor;
+}
+
+.flow__chip--extension {
+  border: 1px dashed var(--line-strong);
+  background: #fff;
   color: var(--muted);
 }
 
-.pipeline__step code {
-  display: block;
-  overflow-x: auto;
+.flow__chip--extension::before {
+  border: 1px solid currentColor;
+  background: transparent;
+}
+
+.flow__loop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  margin-left: var(--flow-indent);
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
   background: #f8fafc;
+  padding: 14px 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.flow__loop-label {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.flow__loop code {
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 9px 11px;
+  border-radius: 5px;
+  background: #fff;
+  padding: 1px 5px;
   color: #334155;
-  font-size: 11.5px;
-  white-space: nowrap;
+  font-size: 10.5px;
 }
 
 .callout {
@@ -1374,14 +1587,52 @@ kbd {
     grid-template-columns: 1fr;
   }
 
-  .pipeline {
+  .flow__stage {
     grid-template-columns: 1fr;
+  }
+
+  .flow__mounts {
+    border-left: 0;
+    border-top: 1px dashed var(--line);
+    padding: 12px 0 0;
   }
 }
 
 @media (max-width: 720px) {
   .section {
     padding: 56px 18px;
+  }
+
+  .flow {
+    --flow-pad: 14px;
+    --flow-index: 38px;
+    --flow-indent: 14px;
+  }
+
+  .flow__legend {
+    gap: 8px 14px;
+  }
+
+  .flow__list::before {
+    left: 2px;
+  }
+
+  .flow__core {
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .flow__head h3 {
+    font-size: 14px;
+  }
+
+  .flow__body p {
+    font-size: 13px;
+  }
+
+  .flow__chip {
+    width: 100%;
+    border-radius: 10px;
   }
 
   .hero h1 {
