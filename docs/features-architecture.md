@@ -1,6 +1,6 @@
 # 附加功能架构设计（设计稿）
 
-- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、自定义 feature 示例（cell-marker）、行/列小计/总计（含双轴交叉与多度量分列）、悬浮滚动条已实现，核心旧热力图已移除；真正的跨层单格合并、折叠 / 展开仍未实现。
+- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、自定义 feature 示例（cell-marker）、行/列小计/总计（含双轴交叉与多度量分列）、悬浮滚动条、折叠 / 展开（compact 单度量首版）已实现，核心旧热力图已移除；跨层单格合并、cartesian / 多度量 / 汇总叠加的折叠仍未实现。
 - **日期**：2026-11-02
 - **范围**：并列度量、热力图、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
 - **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
@@ -53,20 +53,18 @@ src/
     dual-measure.mjs  已实现：并列度量布局
     heatmap.mjs       已实现：热力图渲染
     cell-marker.mjs   已实现：自定义 feature 示例（cellStyle + overlay）
+    collapse.mjs      已实现：展开 / 折叠（compact 单度量首版）
     overlay.mjs       已实现：自定义叠加渲染（角区示例）
     scrollbar.mjs     已实现：悬浮滚动条（绘制 + 命中测试 + 拖拽换算）
     totals.mjs        已实现：行/列小计/总计（含双轴交叉）
     index.mjs         可选：feature 统一入口（尚未创建）
-    subtotals.mjs     规划中
-    collapse.mjs      规划中
 test/
   features/
     dual-measure.test.mjs  已实现
     heatmap.test.mjs       已实现
     cell-marker.test.mjs   已实现
+    collapse.test.mjs      已实现
     scrollbar.test.mjs     已实现
-    subtotals.test.mjs     规划中
-    collapse.test.mjs      规划中
   architecture.test.mjs    已实现：依赖方向守卫
 ```
 
@@ -163,6 +161,18 @@ renderer 的绘制路径。
 - 页面 `#quickstart` 的“自定义 feature”卡片提供数据派生、布局派生、
   渲染配置、overlay 和交互等挂载点的文档入口；
 - 完整说明见 [custom-features.md](custom-features.md)。
+
+## 3.7 已实现：展开 / 折叠（compact 单度量首版）
+
+`src/features/collapse.mjs` 在 aggregate 之后派生折叠数据，核心布局 / 渲染不改：
+
+- `collapseCube(cube, collapsed)`：按 `collapseKey(axis, dimension, value)` 找到第一个被折叠的父成员，把其子维度替换为 `（全部）`，并按度量重新上卷；avg 用 `__valueCount` 加权；
+- `hitTestHeader(layout, geometry, point)`：命中行 / 列父表头，返回 `axis / dimension / value / key`；
+- `drawCollapseIndicators(ctx, { layout, geometry, collapsed })`：在父表头右侧画 + / −；
+- Demo“折叠模式”开启后点击父表头切换，关闭时清除状态并恢复完整布局；
+- 首版只支持 compact 单度量；cartesian、并列度量、行 / 列汇总与折叠暂不叠加；
+- 测试见 `test/features/collapse.test.mjs`；完整挂载点说明见
+  [custom-features.md](custom-features.md#collapse)。
 
 ## 4. 依赖规则
 
@@ -268,12 +278,10 @@ site / examples / bench
 
 ## 9. 未来落地顺序
 
-1. 为小计 / 总计写独立设计，明确展示布局的派生规则。
-2. 实现并测试小计 / 总计 feature。
-3. 为折叠 / 展开写独立设计，明确状态、过滤/上卷和重新布局策略。
-4. 实现并测试折叠 / 展开 feature。
-5. 在 `site/` 接入控件与状态，复用共享 demo 控制器。
-6. 补充文档和架构守卫测试。
+1. 小计 / 总计、折叠 / 展开基础版已实现，并在 `site/` 接入控件与状态。
+2. 扩展折叠：cartesian、并列度量、行 / 列汇总叠加。
+3. 真正的跨层单格合并。
+4. 继续补充文档、示例入口和架构守卫测试。
 
 ## 10. 评审清单
 

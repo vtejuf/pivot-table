@@ -211,8 +211,11 @@
                   <span class="flow__chip flow__chip--feature">
                     <strong>totals</strong>· rollupTotals(cube) + withTotals(layout)
                   </span>
+                  <span class="flow__chip flow__chip--feature">
+                    <strong>collapse</strong>· collapseCube() + 表头交互
+                  </span>
                   <span class="flow__chip flow__chip--extension">
-                    <strong>展示布局派生</strong>· 排序 / 合并 / 折叠
+                    <strong>展示布局派生</strong>· 排序 / 合并 / 自定义派生
                   </span>
                 </div>
               </li>
@@ -473,8 +476,13 @@ y  =  [   3       1      0     0 ] · v</pre>
               </div>
 
               <span class="demo-extensions__divider" aria-hidden="true"></span>
-              <button type="button" disabled>折叠 / 展开</button>
-              <span class="demo-extensions__hint">折叠 / 展开后续接入模型层</span>
+              <label class="check">
+                <input type="checkbox" data-demo-collapse />
+                <span>折叠模式</span>
+              </label>
+              <span class="demo-extensions__hint">
+                开启后点击行/列父表头折叠；与并列度量、行/列汇总、cartesian 暂不叠加
+              </span>
             </div>
 
             <p class="demo-error" data-demo-error role="alert" hidden></p>
@@ -486,7 +494,8 @@ y  =  [   3       1      0     0 ] · v</pre>
             后可用方向键、<kbd>PageUp</kbd> / <kbd>PageDown</kbd>、<kbd>Home</kbd> /
             <kbd>End</kbd>。并列度量时，热力图和行/列汇总都按 measure 分列。角区标签
             开关演示自定义叠加层；高值标记演示自定义 feature：cellStyle 改底色，
-            renderWithOverlay 画角标；行/列小计与总计分别在 region、year 维度末尾插入汇总。
+            renderWithOverlay 画角标；折叠模式开启后可点击行/列父表头折叠。行/列小计
+            与总计分别在 region、year 维度末尾插入汇总。
           </p>
         </section>
 
@@ -852,7 +861,7 @@ node --test test/model/*.test.mjs test/render/*.test.mjs \
               <ol class="plan-list">
                 <li>
                   <strong>选挂载点</strong>
-                  <span>渲染配置、渲染后叠加或布局派生。</span>
+                  <span>数据派生、布局派生、渲染配置或渲染后叠加。</span>
                 </li>
                 <li>
                   <strong>写 createXxx()</strong>
@@ -880,6 +889,13 @@ node --test test/model/*.test.mjs test/render/*.test.mjs \
                   rel="noreferrer"
                 >
                   布局派生 <span aria-hidden="true">↗</span>
+                </a>
+                <a
+                  href="https://github.com/vtejuf/pivot-table/blob/dev/docs/custom-features.md#collapse"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  展开 / 折叠 <span aria-hidden="true">↗</span>
                 </a>
                 <a
                   href="https://github.com/vtejuf/pivot-table/blob/dev/docs/custom-features.md#render-config"

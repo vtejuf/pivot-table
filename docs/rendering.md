@@ -200,6 +200,22 @@ const next = scrollFromThumbPosition(hit.bar, y, grabOffset);
 汇总格带 `cell.kind = 'subtotal' | 'total'`，`cellStyle` 可据此区分。
 设计与边界见 [totals.md](totals.md)。
 
+## 展开 / 折叠 feature
+
+`src/features/collapse.mjs` 在 `aggregate()` 之后按折叠状态重新上卷，再交给核心
+`layoutPivot()`；核心布局与渲染器不改：
+
+- `collapseKey(axis, dimension, value)`：稳定的折叠键；
+- `collapseCube(cube, collapsed)`：把被折叠父成员的子维度替换为 `（全部）`，
+  按度量重新上卷（avg 用 `__valueCount` 加权）；
+- `hitTestHeader(layout, geometry, point)`：命中行 / 列父表头；
+- `drawCollapseIndicators(ctx, { layout, geometry, collapsed })`：在父表头右侧
+  画 + / − 指示器；
+- 首版只支持 compact 单度量，暂不与并列度量、行 / 列汇总叠加；cartesian 会
+  为每个父级补齐全局子成员，因此也不支持；
+- Demo 通过“折叠模式”开关接入，关闭时清除状态并恢复完整布局；
+- 完整挂载点说明见 [custom-features.md](custom-features.md#collapse)。
+
 ## 交互扩展
 
 命中测试可以直接复用模型：
@@ -250,5 +266,6 @@ node --test test/model/*.test.mjs test/render/*.test.mjs \
 热力图颜色、浅色/深色文字和双度量分范围由 `test/features/heatmap.test.mjs`
 覆盖。滚动条几何、thumb 映射、命中测试、hover / active 绘制、透明度和自动隐藏
 状态机由 `test/features/scrollbar.test.mjs` 覆盖。自定义 feature 示例的谓词匹配、
-可见范围裁剪和样式由 `test/features/cell-marker.test.mjs` 覆盖；挂载点说明见
+可见范围裁剪和样式由 `test/features/cell-marker.test.mjs` 覆盖；折叠数据上卷、
+表头命中与指示器由 `test/features/collapse.test.mjs` 覆盖。挂载点说明见
 [custom-features.md](custom-features.md)。

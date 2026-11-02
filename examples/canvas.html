@@ -148,6 +148,9 @@
       #pivot.is-scrollbar-dragging {
         cursor: default;
       }
+      #pivot.is-header-hover {
+        cursor: pointer;
+      }
       #pivot:focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: -2px;
@@ -245,6 +248,10 @@
             高值标记
           </label>
           <label class="check">
+            <input id="collapse" type="checkbox" data-demo-collapse />
+            折叠模式
+          </label>
+          <label class="check">
             <input id="overlay" type="checkbox" data-demo-overlay checked />
             角区标签
           </label>
@@ -301,8 +308,9 @@
         滚动条 / 方向键平移，表头冻结；滚动条在停止操作后自动隐藏，悬停或拖动时
         保持显示。并列度量时，热力图和行/列汇总都按 measure
         分列。角区标签开关演示自定义叠加层；高值标记开关演示自定义 feature：
-        cellStyle 改底色，renderWithOverlay 画角标；行/列小计与总计分别在 region、
-        year 维度末尾插入汇总。
+        cellStyle 改底色，renderWithOverlay 画角标；折叠模式开启后点击行/列父表头
+        折叠，与并列度量、行/列汇总、cartesian 暂不叠加。行/列小计与总计分别在
+        region、year 维度末尾插入汇总。
       </p>
     </main>
 

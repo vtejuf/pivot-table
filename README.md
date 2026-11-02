@@ -33,6 +33,7 @@ src/
     dual-measure.mjs   并列度量：度量作为最末列维度（附加功能）
     heatmap.mjs        热力图：通过 cellStyle 渲染，按 measure 分组色阶
     cell-marker.mjs    自定义 feature 示例：cellStyle + overlay 标记高值
+    collapse.mjs       展开/折叠：按父成员重新上卷 + 表头命中与指示器
     overlay.mjs        自定义叠加：核心绘制后追加装饰（附角区示例）
     scrollbar.mjs      悬浮滚动条：轨道 / thumb 绘制 + 命中测试 + 拖拽换算
     totals.mjs         行/列小计/总计：统一上卷 + 双轴展示布局（支持多度量）
@@ -49,6 +50,7 @@ test/
     dual-measure.test.mjs  并列度量测试
     heatmap.test.mjs       热力图测试
     cell-marker.test.mjs   自定义标记示例测试
+    collapse.test.mjs      展开/折叠与表头命中测试
     overlay.test.mjs       自定义叠加与角区示例测试
     scrollbar.test.mjs     悬浮滚动条几何、命中测试与拖拽换算
     totals.test.mjs        行/列小计/总计与多度量测试
@@ -235,6 +237,9 @@ const { geometry, stats } = renderPivot(canvas, result, {
 - **行/列小计/总计 feature**：`rollupTotals()` 统一上卷，多度量用
   `rollupMultiTotals()` 按 measure 分列；`withTotals()` 插入行/列、重建表头并
   填充交叉格；支持指定维度、末尾汇总，核心模型与渲染器不改；
+- **展开/折叠 feature**：`collapseCube()` 按父成员重新上卷，`hitTestHeader()`
+  命中父表头，`drawCollapseIndicators()` 绘制 +/−；首版支持 compact 单度量，
+  暂不与并列度量、cartesian、行/列汇总叠加；
 - 核心渲染器只保留 `cellStyle` / `formatValue` 接缝，不再包含热力图逻辑；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；
 - 传入 canvas 时按 DPR 设置物理像素，也可直接传 2D context；

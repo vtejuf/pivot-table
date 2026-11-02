@@ -999,6 +999,10 @@ select:disabled {
   cursor: default;
 }
 
+.demo-stage canvas.is-header-hover {
+  cursor: pointer;
+}
+
 .demo-status {
   display: flex;
   flex-wrap: wrap;

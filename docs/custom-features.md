@@ -106,6 +106,31 @@ renderPivot(canvas, display, { viewport });
 
 参考：`src/features/totals.mjs`、[totals.md](totals.md)。
 
+<a id="collapse"></a>
+## 2.1 展开 / 折叠
+
+折叠先在数据层重新上卷，再交给核心 `layoutPivot()`；它不是原地修改 layout：
+
+```js
+import { layoutPivot } from './src/model/index.mjs';
+import { collapseCube, collapseKey } from './src/features/collapse.mjs';
+
+const collapsed = new Set([collapseKey('row', 'region', '华东')]);
+const next = collapseCube(cube, collapsed);
+const layout = layoutPivot(next.rows, {
+  dimensions: next.dimensions,
+  value: 'sales',
+  mode: 'compact',
+});
+```
+
+- 首版只支持 compact 单度量；cartesian、并列度量、行/列汇总暂不叠加；
+- 被折叠父成员的子维度显示为 `（全部）`，表示该父级的汇总；
+- 父表头命中用 `hitTestHeader()`，指示器用 `drawCollapseIndicators()`；
+- 折叠键用 `collapseKey(axis, dimension, value)` 生成，存进 Set 即可切换。
+
+参考：`src/features/collapse.mjs`、`test/features/collapse.test.mjs`。
+
 <a id="render-config"></a>
 ## 3. 渲染配置：cellStyle / formatValue / theme
 

@@ -8,6 +8,7 @@
  *   [data-demo-dual-measure] 并列度量 checkbox
  *   [data-demo-heatmap]  数值色阶 checkbox
  *   [data-demo-marker]   高值标记 checkbox（自定义 feature 示例）
+ *   [data-demo-collapse] 折叠模式 checkbox（点击父表头折叠 / 展开）
  *   [data-demo-overlay]  角区标签开关
  *   [data-demo-row-subtotal] 行小计 checkbox
  *   [data-demo-row-total]    行总计 checkbox
@@ -21,6 +22,10 @@
  * 并列度量只负责布局数据：度量作为列轴最末层维度。热力图由 feature 通过
  * cellStyle 提供；双度量时按 measure 分别计算色阶。高值标记由
  * features/cell-marker.mjs 提供，cellStyle 上色 + overlay 画角标。
+ *
+ * 折叠模式由 features/collapse.mjs 接入：开启后点击行/列父表头折叠，
+ * 关闭时清除状态并恢复完整布局。首版只支持 compact 单度量，与并列度量、
+ * 行/列汇总、cartesian 互斥（控件会自动禁用并清除折叠状态）。
  *
  * 滚动条始终启用：由 features/scrollbar.mjs 在核心绘制后叠加，无需控件。
  * 交互后显示，停止操作约 900ms 后淡出；悬停或拖动滚动条时固定显示。
@@ -48,6 +53,11 @@ import {
 import { combineMeasures } from '../src/features/dual-measure.mjs';
 import { createHeatmapStyle } from '../src/features/heatmap.mjs';
 import { createCellMarker } from '../src/features/cell-marker.mjs';
+import {
+  collapseCube,
+  drawCollapseIndicators,
+  hitTestHeader,
+} from '../src/features/collapse.mjs';
 import {
   rollupMultiTotals,
   rollupTotals,
@@ -82,6 +92,7 @@ export function createPivotDemo(root = document, options = {}) {
   const dualInput = scope.querySelector('[data-demo-dual-measure]');
   const heatmapInput = scope.querySelector('[data-demo-heatmap]');
   const markerInput = scope.querySelector('[data-demo-marker]');
+  const collapseInput = scope.querySelector('[data-demo-collapse]');
   const overlayInput = scope.querySelector('[data-demo-overlay]');
   const rowSubtotalInput = scope.querySelector('[data-demo-row-subtotal]');
   const rowTotalInput = scope.querySelector('[data-demo-row-total]');
@@ -128,6 +139,8 @@ export function createPivotDemo(root = document, options = {}) {
   let markerFeature = null;
   let totalsActive = false;
   let hoverAxis = null;
+  let collapseMode = false;
+  const collapsed = new Set();
   const cornerLabels = createCornerLabels();
   const scrollbarOverlay = createScrollbarOverlay();
   const autoHide = createScrollbarAutoHide();
@@ -149,22 +162,58 @@ export function createPivotDemo(root = document, options = {}) {
     if (measureSelect) measureSelect.disabled = dual;
   }
 
+  function syncCollapseControl({ dual, totalsRequested, mode }) {
+    if (!collapseInput) {
+      collapseMode = false;
+      collapsed.clear();
+      return;
+    }
+
+    const unsupported = dual || totalsRequested || mode === 'cartesian';
+    collapseInput.disabled = unsupported;
+
+    if (unsupported) {
+      if (collapseInput.checked) collapseInput.checked = false;
+      collapseMode = false;
+      collapsed.clear();
+      canvas.classList.remove('is-header-hover');
+      return;
+    }
+
+    collapseMode = Boolean(collapseInput.checked);
+    if (!collapseMode) collapsed.clear();
+  }
+
   function rebuildLayout(resetScroll = true) {
     const dual = isDual();
-    const cube = dual ? dualCube : currentCube();
-    const base = layoutPivot(cube.rows, {
-      dimensions: cube.dimensions,
-      value: dual ? cube.value : cube.measure.key,
-      mode: modeSelect?.value ?? 'compact',
-    });
-
-    totalsActive = false;
+    const mode = modeSelect?.value ?? 'compact';
     const rowSubtotal = Boolean(rowSubtotalInput?.checked);
     const rowTotal = Boolean(rowTotalInput?.checked);
     const colSubtotal = Boolean(colSubtotalInput?.checked);
     const colTotal = Boolean(colTotalInput?.checked);
+    const totalsRequested =
+      rowSubtotal || rowTotal || colSubtotal || colTotal;
 
-    if (!dual && (rowSubtotal || rowTotal || colSubtotal || colTotal)) {
+    syncCollapseControl({ dual, totalsRequested, mode });
+
+    const cube = dual ? dualCube : currentCube();
+    const source =
+      collapseMode &&
+      collapsed.size > 0 &&
+      !dual &&
+      !totalsRequested &&
+      mode === 'compact'
+        ? collapseCube(cube, collapsed)
+        : cube;
+    const base = layoutPivot(source.rows, {
+      dimensions: source.dimensions,
+      value: dual ? cube.value : cube.measure.key,
+      mode,
+    });
+
+    totalsActive = false;
+
+    if (!dual && totalsRequested) {
       const rolled = rollupTotals(cube, {
         rows: {
           subtotals: rowSubtotal ? ['region'] : [],
@@ -177,7 +226,7 @@ export function createPivotDemo(root = document, options = {}) {
       });
       layout = withTotals(base, rolled);
       totalsActive = !rolled.skipped;
-    } else if (dual && (rowSubtotal || rowTotal || colSubtotal || colTotal)) {
+    } else if (dual && totalsRequested) {
       const rolled = rollupMultiTotals(
         [
           { label: '销售额', cube: salesCube },
@@ -250,6 +299,23 @@ export function createPivotDemo(root = document, options = {}) {
     return markerFeature;
   }
 
+  function headerHit(point) {
+    if (!collapseMode || !layout || !lastGeometry) return null;
+    return hitTestHeader(layout, lastGeometry, point);
+  }
+
+  function toggleCollapse(target) {
+    if (!target) return;
+    if (collapsed.has(target.key)) collapsed.delete(target.key);
+    else collapsed.add(target.key);
+    canvas.classList.remove('is-header-hover');
+    rebuildLayout(false);
+  }
+
+  function updateHeaderHover(point) {
+    canvas.classList.toggle('is-header-hover', Boolean(headerHit(point)));
+  }
+
   function render() {
     if (!layout) return;
 
@@ -277,6 +343,13 @@ export function createPivotDemo(root = document, options = {}) {
     };
 
     const drawOverlays = (ctx, context) => {
+      if (collapseMode) {
+        drawCollapseIndicators(ctx, {
+          layout,
+          geometry: context.geometry,
+          collapsed,
+        });
+      }
       if (marker) marker.draw(ctx, context);
       if (overlayInput?.checked) cornerLabels(ctx, context);
       scrollbarOverlay.draw(ctx, context);
@@ -374,6 +447,7 @@ export function createPivotDemo(root = document, options = {}) {
         `<strong>${layout.size.rows} 行 × ${layout.size.cols} 列</strong>` +
         ` · ${layout.mode}` +
         (totalsActive ? ' · 行/列汇总' : '') +
+        (collapseMode ? ` · 折叠 ${collapsed.size}` : '') +
         (isDual() ? ' · 并列度量' : '');
     }
 
@@ -401,6 +475,10 @@ export function createPivotDemo(root = document, options = {}) {
   });
   listen(heatmapInput, 'change', render);
   listen(markerInput, 'change', render);
+  listen(collapseInput, 'change', () => {
+    canvas.classList.remove('is-header-hover');
+    rebuildLayout(false);
+  });
   listen(overlayInput, 'change', render);
   listen(rowSubtotalInput, 'change', () => rebuildLayout());
   listen(rowTotalInput, 'change', () => rebuildLayout());
@@ -507,6 +585,15 @@ export function createPivotDemo(root = document, options = {}) {
       return;
     }
 
+    if (collapseMode) {
+      const header = headerHit(point);
+      if (header) {
+        event.preventDefault();
+        toggleCollapse(header);
+        return;
+      }
+    }
+
     revealScrollbars();
     drag = {
       pointerId: event.pointerId,
@@ -536,12 +623,15 @@ export function createPivotDemo(root = document, options = {}) {
     }
 
     if (event.pointerType !== 'touch') {
-      updateScrollbarHover(canvasPoint(event));
+      const point = canvasPoint(event);
+      updateHeaderHover(point);
+      updateScrollbarHover(point);
     }
   });
 
   listen(canvas, 'pointerleave', () => {
     if (scrollbarDrag) return;
+    canvas.classList.remove('is-header-hover');
     const hadHover = hoverAxis !== null;
     hoverAxis = null;
     scrollbarOverlay.setHover(null);

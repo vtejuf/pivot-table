@@ -139,4 +139,28 @@ renderWithOverlay(canvas, layout, {
   cellStyle: marker.cellStyle,
 }, marker.draw);`,
   },
+  {
+    id: 'collapse',
+    label: '展开/折叠',
+    file: 'collapse.mjs',
+    note: '基于 aggregate 结果重新上卷；首版只支持 compact 单度量，cartesian、并列度量、行/列汇总暂不叠加。',
+    code: `import { layoutPivot } from './src/model/index.mjs';
+import {
+  collapseCube,
+  collapseKey,
+  drawCollapseIndicators,
+  hitTestHeader,
+} from './src/features/collapse.mjs';
+
+const collapsed = new Set([collapseKey('row', 'region', '华东')]);
+const next = collapseCube(cube, collapsed);
+const layout = layoutPivot(next.rows, {
+  dimensions: next.dimensions,
+  value: 'sales',
+  mode: 'compact',
+});
+
+// pointerdown: hitTestHeader(layout, geometry, point)
+// renderWithOverlay: drawCollapseIndicators(ctx, { layout, geometry, collapsed })`,
+  },
 ];
