@@ -240,6 +240,7 @@ const { geometry, stats } = renderPivot(canvas, result, {
 - **展开/折叠 feature**：`collapseCube()` 按父成员重新上卷，`hitTestHeader()`
   命中父表头，`drawCollapseIndicators()` 绘制 +/−；可与行/列汇总、并列度量
   同时使用（多度量分别折叠每个 measure 的 cube 再合并），暂不与 cartesian 叠加；
+  多度量下 measure 及其直接父维度不显示折叠按钮；
 - 核心渲染器只保留 `cellStyle` / `formatValue` 接缝，不再包含热力图逻辑；
 - `formatValue`、`cellStyle` 自定义文本和单元格样式；
 - 传入 canvas 时按 DPR 设置物理像素，也可直接传 2D context；

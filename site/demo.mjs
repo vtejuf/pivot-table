@@ -25,7 +25,8 @@
  *
  * 折叠模式由 features/collapse.mjs 接入：开启后点击行/列父表头折叠，
  * 关闭时清除状态并恢复完整布局。单度量、并列度量都可与行/列汇总共存
- * （折叠父级跳过小计，总计保留）；cartesian 无法表达折叠布局，控件会禁用。
+ * （折叠父级跳过小计，总计保留）；多度量下 measure 及其直接父维度不参与折叠；
+ * cartesian 无法表达折叠布局，控件会禁用。
  *
  * 滚动条始终启用：由 features/scrollbar.mjs 在核心绘制后叠加，无需控件。
  * 交互后显示，停止操作约 900ms 后淡出；悬停或拖动滚动条时固定显示。
@@ -142,6 +143,7 @@ export function createPivotDemo(root = document, options = {}) {
   let hoverAxis = null;
   let collapseMode = false;
   const collapsed = new Set();
+  const blockedCollapseDimensions = new Set();
   const cornerLabels = createCornerLabels();
   const scrollbarOverlay = createScrollbarOverlay();
   const autoHide = createScrollbarAutoHide();
@@ -245,6 +247,18 @@ export function createPivotDemo(root = document, options = {}) {
       mode,
     });
 
+    blockedCollapseDimensions.clear();
+    if (dual) {
+      const measureDimension = source.dimensions.find(
+        (dimension) =>
+          dimension.axis === 'col' && dimension.key === source.measureKey,
+      );
+      blockedCollapseDimensions.add(`col:${source.measureKey}`);
+      if (measureDimension?.parent) {
+        blockedCollapseDimensions.add(`col:${measureDimension.parent}`);
+      }
+    }
+
     totalsActive = false;
 
     if (!dual && totalsRequested) {
@@ -327,9 +341,15 @@ export function createPivotDemo(root = document, options = {}) {
     return markerFeature;
   }
 
+  function canCollapseHeader({ axis, dimension }) {
+    return !blockedCollapseDimensions.has(`${axis}:${dimension}`);
+  }
+
   function headerHit(point) {
     if (!collapseMode || !layout || !lastGeometry) return null;
-    return hitTestHeader(layout, lastGeometry, point);
+    return hitTestHeader(layout, lastGeometry, point, {
+      canCollapse: canCollapseHeader,
+    });
   }
 
   function toggleCollapse(target) {
@@ -376,6 +396,7 @@ export function createPivotDemo(root = document, options = {}) {
           layout,
           geometry: context.geometry,
           collapsed,
+          canCollapse: canCollapseHeader,
         });
       }
       if (marker) marker.draw(ctx, context);

@@ -155,6 +155,10 @@ const layout = layoutPivot(dual.rows, {
 汇总时用折叠后的 cube 上卷，并给 `withTotals()` 传 `shouldIncludeSubtotal`，
 跳过折叠父级的小计；总计保留，交叉格才能完整。
 
+多度量布局中，`measure` 维度及其**直接父维度**不具备折叠语义：父维度折叠会
+把 measure 一起替换。用 `hitTestHeader()` / `drawCollapseIndicators()` 的
+`canCollapse` 过滤这两个维度，不显示按钮也不响应点击。
+
 参考：`src/features/collapse.mjs`、`test/features/collapse.test.mjs`。
 
 <a id="render-config"></a>

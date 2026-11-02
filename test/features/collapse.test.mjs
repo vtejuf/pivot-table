@@ -382,6 +382,30 @@ test('多度量折叠 + 行/列汇总：保留 measure 列并跳过折叠小计'
     )?.value,
     2,
   );
+
+  const geo = computePivotGeometry(display);
+  const phoneRect = geo.colHeaderRect(1, phone.offset, phone.size);
+  const phonePoint = { x: phoneRect.x + 5, y: phoneRect.y + 5 };
+  assert.equal(hitTestHeader(display, geo, phonePoint)?.dimension, 'product');
+  assert.equal(
+    hitTestHeader(display, geo, phonePoint, {
+      canCollapse: ({ axis, dimension }) =>
+        !(axis === 'col' && dimension === 'product'),
+    }),
+    null,
+  );
+
+  const { ctx } = createFakeContext();
+  assert.equal(
+    drawCollapseIndicators(ctx, {
+      layout: display,
+      geometry: geo,
+      collapsed,
+      canCollapse: ({ axis, dimension }) =>
+        !(axis === 'col' && dimension === 'product'),
+    }),
+    4,
+  );
 });
 
 test('avg 使用 __valueCount 加权上卷，空折叠状态返回原 rows', () => {
@@ -492,4 +516,17 @@ test('参数校验', () => {
   assert.throws(() => collapseKey('x', 'a', 1), /axis/);
   assert.equal(hitTestHeader(null, null, { x: 0, y: 0 }), null);
   assert.equal(drawCollapseIndicators(null, {}), 0);
+
+  const layout = makeLayout(makeCube());
+  const geometry = computePivotGeometry(layout);
+  assert.throws(
+    () =>
+      hitTestHeader(layout, geometry, { x: 0, y: 0 }, { canCollapse: true }),
+    /canCollapse/,
+  );
+  const { ctx } = createFakeContext();
+  assert.throws(
+    () => drawCollapseIndicators(ctx, { layout, geometry, canCollapse: true }),
+    /canCollapse/,
+  );
 });

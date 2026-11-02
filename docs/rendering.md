@@ -213,6 +213,7 @@ const next = scrollFromThumbPosition(hit.bar, y, grabOffset);
   画 + / − 指示器；
 - 首版只支持 compact，可与行 / 列汇总、并列度量同时使用，折叠父级跳过小计、总计保留；
   多度量时对每个 measure 的 cube 分别 collapseCube，再 combineMeasures；
+  measure 及其直接父维度不参与折叠，用 `canCollapse` 过滤；
   暂不支持 cartesian：它会为每个父级补齐全局子成员；
 - Demo 通过“折叠模式”开关接入，关闭时清除状态并恢复完整布局；
 - 完整挂载点说明见 [custom-features.md](custom-features.md#collapse)。

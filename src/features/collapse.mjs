@@ -164,6 +164,15 @@ export function collapseCube(cube, collapsed = new Set()) {
  * @param {object} layout
  * @param {object} geometry computePivotGeometry() 的结果
  * @param {{ x: number, y: number }} point 屏幕坐标（CSS 像素）
+ * @param {{
+ *   canCollapse?: (context: {
+ *     axis: 'row' | 'col',
+ *     dimension: string,
+ *     value: unknown,
+ *     depth: number,
+ *     member: object
+ *   }) => boolean
+ * }} options canCollapse 返回 false 的维度不响应折叠
  * @returns {{
  *   axis: 'row' | 'col',
  *   dimension: string,
@@ -173,9 +182,10 @@ export function collapseCube(cube, collapsed = new Set()) {
  *   depth: number
  * } | null}
  */
-export function hitTestHeader(layout, geometry, point) {
+export function hitTestHeader(layout, geometry, point, options = {}) {
   if (!layout || !geometry || !point) return null;
   if (!isFinitePoint(point)) return null;
+  assertOptionalFunction(options.canCollapse, 'hitTestHeader: options.canCollapse');
 
   const row = hitAxis(
     layout.axes?.row?.header,
@@ -183,6 +193,7 @@ export function hitTestHeader(layout, geometry, point) {
     geometry.rowHeaderClip,
     geometry.rowHeaderRect,
     point,
+    options.canCollapse,
   );
   if (row) return row;
 
@@ -192,6 +203,7 @@ export function hitTestHeader(layout, geometry, point) {
     geometry.colHeaderClip,
     geometry.colHeaderRect,
     point,
+    options.canCollapse,
   );
 }
 
@@ -202,14 +214,28 @@ export function hitTestHeader(layout, geometry, point) {
  * @param {{
  *   layout: object,
  *   geometry: object,
- *   collapsed?: Set<string>
- * }} context
+ *   collapsed?: Set<string>,
+ *   canCollapse?: (context: {
+ *     axis: 'row' | 'col',
+ *     dimension: string,
+ *     value: unknown,
+ *     depth: number,
+ *     member: object
+ *   }) => boolean
+ * }} context canCollapse 返回 false 的维度不画指示器
  * @returns {number} 实际绘制的指示器数量
  */
-export function drawCollapseIndicators(ctx, { layout, geometry, collapsed } = {}) {
+export function drawCollapseIndicators(
+  ctx,
+  { layout, geometry, collapsed, canCollapse } = {},
+) {
   if (!ctx || typeof ctx.fillText !== 'function' || !layout || !geometry) {
     return 0;
   }
+  assertOptionalFunction(
+    canCollapse,
+    'drawCollapseIndicators: canCollapse',
+  );
 
   const state = collapsed instanceof Set ? collapsed : new Set(collapsed ?? []);
   let drawn = 0;
@@ -226,6 +252,7 @@ export function drawCollapseIndicators(ctx, { layout, geometry, collapsed } = {}
         geometry.rowHeaderRect,
         geometry.rowHeaderClip,
         state,
+        canCollapse,
         0,
       );
       ctx.restore();
@@ -241,6 +268,7 @@ export function drawCollapseIndicators(ctx, { layout, geometry, collapsed } = {}
         geometry.colHeaderRect,
         geometry.colHeaderClip,
         state,
+        canCollapse,
         0,
       );
       ctx.restore();
@@ -356,7 +384,7 @@ function finalValue(group, aggregate) {
   }
 }
 
-function hitAxis(node, axis, clip, rectFn, point) {
+function hitAxis(node, axis, clip, rectFn, point, canCollapse) {
   if (!node || !clip || typeof rectFn !== 'function') return null;
   if (!containsRect(clip, point)) return null;
   return walk(node, 0);
@@ -369,9 +397,18 @@ function hitAxis(node, axis, clip, rectFn, point) {
 
       const hasChildren =
         member.children && (member.children.members?.length ?? 0) > 0;
-      const collapsible = hasChildren && !member.kind;
+      const canHit = hasChildren && !member.kind;
+      const canCollapseMember =
+        canHit &&
+        allowsCollapse(canCollapse, {
+          axis,
+          dimension: current.key,
+          value: member.value,
+          depth,
+          member,
+        });
       if (containsRect(rect, point)) {
-        if (!collapsible) return null;
+        if (!canCollapseMember) return null;
         return {
           axis,
           dimension: current.key,
@@ -382,7 +419,7 @@ function hitAxis(node, axis, clip, rectFn, point) {
         };
       }
 
-      if (collapsible) {
+      if (canHit) {
         const hit = walk(member.children, depth + 1);
         if (hit) return hit;
       }
@@ -398,6 +435,7 @@ function drawAxisIndicators(
   rectFn,
   clip,
   collapsed,
+  canCollapse,
   depth,
 ) {
   let drawn = 0;
@@ -405,8 +443,18 @@ function drawAxisIndicators(
   for (const member of node.members ?? []) {
     const hasChildren =
       member.children && (member.children.members?.length ?? 0) > 0;
-    const collapsible = hasChildren && !member.kind;
-    if (collapsible) {
+    const canHit = hasChildren && !member.kind;
+    const canCollapseMember =
+      canHit &&
+      allowsCollapse(canCollapse, {
+        axis,
+        dimension: node.key,
+        value: member.value,
+        depth,
+        member,
+      });
+
+    if (canCollapseMember) {
       const rect = rectFn(depth, member.offset, member.size);
       if (rectsIntersect(rect, clip)) {
         const isCollapsed = collapsed.has(
@@ -424,7 +472,9 @@ function drawAxisIndicators(
         ctx.fillText(isCollapsed ? '+' : '−', x, y);
         drawn += 1;
       }
+    }
 
+    if (canHit) {
       drawn += drawAxisIndicators(
         ctx,
         member.children,
@@ -432,12 +482,24 @@ function drawAxisIndicators(
         rectFn,
         clip,
         collapsed,
+        canCollapse,
         depth + 1,
       );
     }
   }
 
   return drawn;
+}
+
+function allowsCollapse(canCollapse, context) {
+  if (typeof canCollapse !== 'function') return true;
+  return Boolean(canCollapse(context));
+}
+
+function assertOptionalFunction(value, name) {
+  if (value !== undefined && typeof value !== 'function') {
+    throw new TypeError(`${name} 必须是函数`);
+  }
 }
 
 function clipRect(ctx, rect) {
