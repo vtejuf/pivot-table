@@ -9,7 +9,8 @@ import {
   drawCollapseIndicators,
   hitTestHeader,
 } from '../../src/features/collapse.mjs';
-import { rollupTotals, withTotals } from '../../src/features/totals.mjs';
+import { combineMeasures } from '../../src/features/dual-measure.mjs';
+import { rollupMultiTotals, rollupTotals, withTotals } from '../../src/features/totals.mjs';
 
 const dimensions = [
   { key: 'region', axis: 'row' },
@@ -240,6 +241,146 @@ test('折叠与行/列汇总共存：跳过折叠父级小计，保留总计和�
       collapsed,
     }),
     4,
+  );
+});
+
+test('多度量折叠 + 行/列汇总：保留 measure 列并跳过折叠小计', () => {
+  const dualDimensions = [
+    { key: 'region', axis: 'row' },
+    { key: 'city', axis: 'row', parent: 'region' },
+    { key: 'year', axis: 'col', order: 'asc' },
+    { key: 'product', axis: 'col', parent: 'year' },
+  ];
+  const dualRows = [
+    { region: 'east', city: 'hangzhou', year: 2023, product: 'phone', sales: 10, units: 1 },
+    { region: 'east', city: 'hangzhou', year: 2024, product: 'phone', sales: 20, units: 2 },
+    { region: 'east', city: 'shanghai', year: 2023, product: 'laptop', sales: 30, units: 3 },
+    { region: 'west', city: 'chengdu', year: 2023, product: 'phone', sales: 40, units: 4 },
+    { region: 'west', city: 'chengdu', year: 2024, product: 'phone', sales: 50, units: 5 },
+  ];
+  const salesCube = aggregate(dualRows, {
+    dimensions: dualDimensions,
+    measure: { key: 'sales', aggregate: 'sum' },
+  });
+  const unitsCube = aggregate(dualRows, {
+    dimensions: dualDimensions,
+    measure: { key: 'units', aggregate: 'sum' },
+  });
+  const collapsed = new Set([
+    collapseKey('row', 'region', 'east'),
+    collapseKey('col', 'year', 2023),
+  ]);
+  const collapsedSales = collapseCube(salesCube, collapsed);
+  const collapsedUnits = collapseCube(unitsCube, collapsed);
+  const dual = combineMeasures({
+    dimensions: dualDimensions,
+    measures: [
+      { label: '销售额', rows: collapsedSales.rows, valueField: 'sales' },
+      { label: '件数', rows: collapsedUnits.rows, valueField: 'units' },
+    ],
+  });
+  const base = layoutPivot(dual.rows, {
+    dimensions: dual.dimensions,
+    value: dual.value,
+    mode: 'compact',
+  });
+  const rolled = rollupMultiTotals(
+    [
+      { label: '销售额', cube: collapsedSales },
+      { label: '件数', cube: collapsedUnits },
+    ],
+    {
+      rows: { subtotals: ['region'], grandTotal: true },
+      cols: { subtotals: ['year'], grandTotal: true },
+      measureKey: dual.measureKey,
+      valueKey: dual.value,
+    },
+  );
+  const display = withTotals(base, rolled, {
+    shouldIncludeSubtotal: ({ axis, path }) =>
+      !path.some((item) =>
+        collapsed.has(collapseKey(axis, item.key, item.value)),
+      ),
+  });
+
+  assert.equal(display.size.rows, 4);
+  assert.equal(display.size.cols, 8);
+
+  const rowHeader = display.axes.row.header;
+  const east = rowHeader.members.find((member) => member.value === 'east');
+  const west = rowHeader.members.find((member) => member.value === 'west');
+  assert.deepEqual(
+    east.children.members.map((member) => member.value),
+    [COLLAPSED_VALUE],
+  );
+  assert.ok(west.children.members.some((member) => member.value === 'west 小计'));
+  assert.ok(rowHeader.members.some((member) => member.value === '总计'));
+
+  const colHeader = display.axes.col.header;
+  const year2023 = colHeader.members.find((member) => member.value === 2023);
+  const year2024 = colHeader.members.find((member) => member.value === 2024);
+  assert.deepEqual(
+    year2023.children.members[0].children.members.map(
+      (member) => member.value,
+    ),
+    ['销售额', '件数'],
+  );
+  const phone = year2024.children.members.find(
+    (member) => member.value === 'phone',
+  );
+  assert.deepEqual(
+    phone.children.members.map((member) => member.value),
+    ['销售额', '件数'],
+  );
+  assert.ok(
+    !year2023.children.members.some((member) =>
+      String(member.value).startsWith('2023 小计'),
+    ),
+  );
+
+  const subtotalSales = year2024.children.members.find(
+    (member) => member.value === '2024 小计 · 销售额',
+  );
+  const subtotalUnits = year2024.children.members.find(
+    (member) => member.value === '2024 小计 · 件数',
+  );
+  assert.ok(subtotalSales);
+  assert.ok(subtotalUnits);
+  assert.ok(
+    colHeader.members.some((member) => member.value === '总计 · 销售额'),
+  );
+  assert.ok(
+    colHeader.members.some((member) => member.value === '总计 · 件数'),
+  );
+
+  const westSubtotal = west.children.members.find(
+    (member) => member.value === 'west 小计',
+  );
+  assert.equal(
+    display.cellMap.get(
+      `${subtotalSales.offset},${westSubtotal.offset}`,
+    )?.value,
+    50,
+  );
+  assert.equal(
+    display.cellMap.get(
+      `${subtotalUnits.offset},${westSubtotal.offset}`,
+    )?.value,
+    5,
+  );
+
+  const eastPlaceholder = east.children.members[0];
+  assert.equal(
+    display.cellMap.get(
+      `${subtotalSales.offset},${eastPlaceholder.offset}`,
+    )?.value,
+    20,
+  );
+  assert.equal(
+    display.cellMap.get(
+      `${subtotalUnits.offset},${eastPlaceholder.offset}`,
+    )?.value,
+    2,
   );
 });
 

@@ -143,7 +143,7 @@ renderWithOverlay(canvas, layout, {
     id: 'collapse',
     label: '展开/折叠',
     file: 'collapse.mjs',
-    note: '基于 aggregate 结果重新上卷；可与行/列汇总同时使用；cartesian、并列度量暂不叠加。',
+    note: '基于 aggregate 结果重新上卷；可与行/列汇总、并列度量同时使用；cartesian 暂不叠加。',
     code: `import { layoutPivot } from './src/model/index.mjs';
 import {
   collapseCube,
@@ -160,6 +160,7 @@ const layout = layoutPivot(next.rows, {
   mode: 'compact',
 });
 
+// 并列度量：分别 collapseCube(salesCube) / collapseCube(countCube)，再 combineMeasures
 // pointerdown: hitTestHeader(layout, geometry, point)
 // renderWithOverlay: drawCollapseIndicators(ctx, { layout, geometry, collapsed })`,
   },

@@ -124,10 +124,36 @@ const layout = layoutPivot(next.rows, {
 });
 ```
 
-- 首版只支持 compact 单度量；可与行/列汇总同时使用；cartesian、并列度量暂不叠加；
+- 首版只支持 compact；可与行/列汇总、并列度量同时使用；cartesian 暂不叠加；
 - 被折叠父成员的子维度显示为 `（全部）`，表示该父级的汇总；
 - 父表头命中用 `hitTestHeader()`，指示器用 `drawCollapseIndicators()`；
 - 折叠键用 `collapseKey(axis, dimension, value)` 生成，存进 Set 即可切换。
+
+多度量时，**分别折叠每个 measure 的 cube，再合并**；不要直接折叠
+`combineMeasures()` 的长表，否则 measure 维度会被一起替换：
+
+```js
+import { combineMeasures } from './src/features/dual-measure.mjs';
+import { collapseCube } from './src/features/collapse.mjs';
+
+const sales = collapseCube(salesCube, collapsed);
+const count = collapseCube(countCube, collapsed);
+const dual = combineMeasures({
+  dimensions: salesCube.dimensions,
+  measures: [
+    { label: '销售额', rows: sales.rows, valueField: sales.measure.key },
+    { label: '订单数', rows: count.rows, valueField: count.measure.key },
+  ],
+});
+const layout = layoutPivot(dual.rows, {
+  dimensions: dual.dimensions,
+  value: dual.value,
+  mode: 'compact',
+});
+```
+
+汇总时用折叠后的 cube 上卷，并给 `withTotals()` 传 `shouldIncludeSubtotal`，
+跳过折叠父级的小计；总计保留，交叉格才能完整。
 
 参考：`src/features/collapse.mjs`、`test/features/collapse.test.mjs`。
 

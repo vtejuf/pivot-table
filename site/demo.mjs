@@ -24,8 +24,8 @@
  * features/cell-marker.mjs 提供，cellStyle 上色 + overlay 画角标。
  *
  * 折叠模式由 features/collapse.mjs 接入：开启后点击行/列父表头折叠，
- * 关闭时清除状态并恢复完整布局。单度量下可与行/列汇总共存（折叠父级
- * 跳过小计，总计保留）；并列度量、cartesian 无法表达折叠布局，控件会禁用。
+ * 关闭时清除状态并恢复完整布局。单度量、并列度量都可与行/列汇总共存
+ * （折叠父级跳过小计，总计保留）；cartesian 无法表达折叠布局，控件会禁用。
  *
  * 滚动条始终启用：由 features/scrollbar.mjs 在核心绘制后叠加，无需控件。
  * 交互后显示，停止操作约 900ms 后淡出；悬停或拖动滚动条时固定显示。
@@ -163,16 +163,16 @@ export function createPivotDemo(root = document, options = {}) {
     if (measureSelect) measureSelect.disabled = dual;
   }
 
-  function syncCollapseControl({ dual, mode }) {
+  function syncCollapseControl({ mode }) {
     if (!collapseInput) {
       collapseMode = false;
       collapsed.clear();
       return;
     }
 
-    // 并列度量和 cartesian 无法表达折叠后的布局，直接禁用。
-    // 单度量下折叠与行/列汇总可以共存。
-    const unsupported = dual || mode === 'cartesian';
+    // cartesian 会为每个父级补齐全局子成员，无法表达折叠后的布局。
+    // 单度量、并列度量都可与行/列汇总共存。
+    const unsupported = mode === 'cartesian';
     collapseInput.disabled = unsupported;
 
     if (unsupported) {
@@ -203,19 +203,45 @@ export function createPivotDemo(root = document, options = {}) {
     const totalsRequested =
       rowSubtotal || rowTotal || colSubtotal || colTotal;
 
-    syncCollapseControl({ dual, mode });
+    syncCollapseControl({ mode });
 
+    const collapseActive =
+      collapseMode && collapsed.size > 0 && mode === 'compact';
     const cube = dual ? dualCube : currentCube();
-    const source =
-      collapseMode &&
-      collapsed.size > 0 &&
-      !dual &&
-      mode === 'compact'
+    const measureCubes = dual
+      ? [
+          {
+            label: '销售额',
+            cube: collapseActive
+              ? collapseCube(salesCube, collapsed)
+              : salesCube,
+          },
+          {
+            label: '订单数',
+            cube: collapseActive
+              ? collapseCube(countCube, collapsed)
+              : countCube,
+          },
+        ]
+      : null;
+    const source = dual
+      ? collapseActive
+        ? combineMeasures({
+            dimensions: salesCube.dimensions,
+            measures: measureCubes.map(({ label, cube: measureCube }) => ({
+              label,
+              rows: measureCube.rows,
+              valueField: measureCube.measure.key,
+            })),
+          })
+        : dualCube
+      : collapseActive
         ? collapseCube(cube, collapsed)
         : cube;
+
     const base = layoutPivot(source.rows, {
       dimensions: source.dimensions,
-      value: dual ? cube.value : cube.measure.key,
+      value: dual ? source.value : source.measure.key,
       mode,
     });
 
@@ -235,24 +261,18 @@ export function createPivotDemo(root = document, options = {}) {
       layout = withTotals(base, rolled, { shouldIncludeSubtotal });
       totalsActive = !rolled.skipped;
     } else if (dual && totalsRequested) {
-      const rolled = rollupMultiTotals(
-        [
-          { label: '销售额', cube: salesCube },
-          { label: '订单数', cube: countCube },
-        ],
-        {
-          rows: {
-            subtotals: rowSubtotal ? ['region'] : [],
-            grandTotal: rowTotal,
-          },
-          cols: {
-            subtotals: colSubtotal ? ['year'] : [],
-            grandTotal: colTotal,
-          },
-          measureKey: dualCube.measureKey,
-          valueKey: dualCube.value,
+      const rolled = rollupMultiTotals(measureCubes, {
+        rows: {
+          subtotals: rowSubtotal ? ['region'] : [],
+          grandTotal: rowTotal,
         },
-      );
+        cols: {
+          subtotals: colSubtotal ? ['year'] : [],
+          grandTotal: colTotal,
+        },
+        measureKey: source.measureKey,
+        valueKey: source.value,
+      });
       layout = withTotals(base, rolled, { shouldIncludeSubtotal });
       totalsActive = !rolled.skipped;
     } else {
