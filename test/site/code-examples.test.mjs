@@ -6,10 +6,10 @@ import { codeExamples } from '../../site/code-examples.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
-test('示例覆盖 Demo 的 6 个功能', () => {
+test('示例覆盖 Demo 的 7 个功能', () => {
   assert.deepEqual(
     codeExamples.map((example) => example.id),
-    ['core', 'dual', 'heatmap', 'totals', 'overlay', 'scrollbar'],
+    ['core', 'dual', 'heatmap', 'totals', 'overlay', 'scrollbar', 'marker'],
   );
 
   for (const example of codeExamples) {

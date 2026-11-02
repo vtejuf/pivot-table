@@ -7,6 +7,7 @@
  *   [data-demo-measure]  度量 select：sales / count
  *   [data-demo-dual-measure] 并列度量 checkbox
  *   [data-demo-heatmap]  数值色阶 checkbox
+ *   [data-demo-marker]   高值标记 checkbox（自定义 feature 示例）
  *   [data-demo-overlay]  角区标签开关
  *   [data-demo-row-subtotal] 行小计 checkbox
  *   [data-demo-row-total]    行总计 checkbox
@@ -18,7 +19,8 @@
  *   [data-demo-grid-size] / [data-demo-stats] / [data-demo-matrix] 状态文本
  *
  * 并列度量只负责布局数据：度量作为列轴最末层维度。热力图由 feature 通过
- * cellStyle 提供；双度量时按 measure 分别计算色阶。
+ * cellStyle 提供；双度量时按 measure 分别计算色阶。高值标记由
+ * features/cell-marker.mjs 提供，cellStyle 上色 + overlay 画角标。
  *
  * 滚动条始终启用：由 features/scrollbar.mjs 在核心绘制后叠加，无需控件。
  * 交互后显示，停止操作约 900ms 后淡出；悬停或拖动滚动条时固定显示。
@@ -45,6 +47,7 @@ import {
 } from '../src/features/scrollbar.mjs';
 import { combineMeasures } from '../src/features/dual-measure.mjs';
 import { createHeatmapStyle } from '../src/features/heatmap.mjs';
+import { createCellMarker } from '../src/features/cell-marker.mjs';
 import {
   rollupMultiTotals,
   rollupTotals,
@@ -78,6 +81,7 @@ export function createPivotDemo(root = document, options = {}) {
   const measureSelect = scope.querySelector('[data-demo-measure]');
   const dualInput = scope.querySelector('[data-demo-dual-measure]');
   const heatmapInput = scope.querySelector('[data-demo-heatmap]');
+  const markerInput = scope.querySelector('[data-demo-marker]');
   const overlayInput = scope.querySelector('[data-demo-overlay]');
   const rowSubtotalInput = scope.querySelector('[data-demo-row-subtotal]');
   const rowTotalInput = scope.querySelector('[data-demo-row-total]');
@@ -121,6 +125,7 @@ export function createPivotDemo(root = document, options = {}) {
   let lastGeometry = null;
   let heatmapStyle = null;
   let heatmapCellStyle = null;
+  let markerFeature = null;
   let totalsActive = false;
   let hoverAxis = null;
   const cornerLabels = createCornerLabels();
@@ -199,6 +204,7 @@ export function createPivotDemo(root = document, options = {}) {
 
     heatmapStyle = null;
     heatmapCellStyle = null;
+    markerFeature = null;
     if (resetScroll) {
       scrollX = 0;
       scrollY = 0;
@@ -221,10 +227,41 @@ export function createPivotDemo(root = document, options = {}) {
     return heatmapCellStyle;
   }
 
+  function getMarkerFeature() {
+    if (!markerInput?.checked || !layout) return null;
+    if (markerFeature) return markerFeature;
+
+    const values = layout.cells
+      .map((cell) => cell.value)
+      .filter((value) => typeof value === 'number' && Number.isFinite(value))
+      .sort((a, b) => a - b);
+
+    const threshold =
+      values.length > 0
+        ? values[Math.min(values.length - 1, Math.floor(values.length * 0.8))]
+        : Number.POSITIVE_INFINITY;
+
+    markerFeature = createCellMarker(layout, {
+      test: (cell) =>
+        typeof cell.value === 'number' &&
+        Number.isFinite(cell.value) &&
+        cell.value >= threshold,
+    });
+    return markerFeature;
+  }
+
   function render() {
     if (!layout) return;
 
     const cellWidth = clampNumber(widthInput?.value, 40, 240, DEFAULT_CELL_WIDTH);
+    const marker = getMarkerFeature();
+    const heatmap = getHeatmapCellStyle();
+    const cellStyle =
+      marker && heatmap
+        ? (cell, context) =>
+            marker.cellStyle(cell, context) ?? heatmap(cell, context)
+        : (marker?.cellStyle ?? heatmap);
+
     const renderOptions = {
       viewport: {
         width: Math.max(320, getWidth()),
@@ -234,12 +271,13 @@ export function createPivotDemo(root = document, options = {}) {
       },
       cellSize: { width: cellWidth, height: 28 },
       headerSize: { row: Math.max(68, Math.round(cellWidth * 0.86)), col: 28 },
-      cellStyle: getHeatmapCellStyle(),
+      cellStyle,
       formatValue: (value) =>
         typeof value === 'number' ? value.toLocaleString('zh-CN') : String(value),
     };
 
     const drawOverlays = (ctx, context) => {
+      if (marker) marker.draw(ctx, context);
       if (overlayInput?.checked) cornerLabels(ctx, context);
       scrollbarOverlay.draw(ctx, context);
     };
@@ -362,6 +400,7 @@ export function createPivotDemo(root = document, options = {}) {
     rebuildLayout();
   });
   listen(heatmapInput, 'change', render);
+  listen(markerInput, 'change', render);
   listen(overlayInput, 'change', render);
   listen(rowSubtotalInput, 'change', () => rebuildLayout());
   listen(rowTotalInput, 'change', () => rebuildLayout());

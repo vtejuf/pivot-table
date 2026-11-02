@@ -1,7 +1,7 @@
 # 附加功能架构设计（设计稿）
 
-- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、行/列小计/总计（含双轴交叉与多度量分列）、悬浮滚动条已实现，核心旧热力图已移除；真正的跨层单格合并、折叠 / 展开仍未实现。
-- **日期**：2026-10-31
+- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、自定义 feature 示例（cell-marker）、行/列小计/总计（含双轴交叉与多度量分列）、悬浮滚动条已实现，核心旧热力图已移除；真正的跨层单格合并、折叠 / 展开仍未实现。
+- **日期**：2026-11-02
 - **范围**：并列度量、热力图、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
 - **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
 
@@ -52,6 +52,7 @@ src/
   features/      附加业务能力
     dual-measure.mjs  已实现：并列度量布局
     heatmap.mjs       已实现：热力图渲染
+    cell-marker.mjs   已实现：自定义 feature 示例（cellStyle + overlay）
     overlay.mjs       已实现：自定义叠加渲染（角区示例）
     scrollbar.mjs     已实现：悬浮滚动条（绘制 + 命中测试 + 拖拽换算）
     totals.mjs        已实现：行/列小计/总计（含双轴交叉）
@@ -62,6 +63,7 @@ test/
   features/
     dual-measure.test.mjs  已实现
     heatmap.test.mjs       已实现
+    cell-marker.test.mjs   已实现
     scrollbar.test.mjs     已实现
     subtotals.test.mjs     规划中
     collapse.test.mjs      规划中
@@ -148,6 +150,19 @@ renderer 的绘制路径。
   滚动条时保持显示；自动隐藏后仍可命中用于悬停唤醒，但 pointerdown 仅在
   透明度大于 0.05 时拖动滚动条；
 - Demo 中指针命中滚动条时优先拖动滚动条，否则继续拖拽平移。
+
+## 3.6 已实现：自定义 feature 示例（cell-marker）
+
+`src/features/cell-marker.mjs` 是编写自定义 feature 的最小完整示例：
+
+- `createCellMarker(layout, { test, ... })` 返回 `cellStyle` 与 `draw`；
+- `cellStyle` 给命中谓词的格子返回背景 / 文字色；
+- `draw` 在 `renderWithOverlay` 后绘制右上角标记，只遍历 `geometry.visible`，
+  并用 `dataClip` 裁剪；
+- Demo 用“高值标记”开关接入，阈值取当前布局数值的 80 分位；
+- 页面 `#quickstart` 的“自定义 feature”卡片提供数据派生、布局派生、
+  渲染配置、overlay 和交互等挂载点的文档入口；
+- 完整说明见 [custom-features.md](custom-features.md)。
 
 ## 4. 依赖规则
 

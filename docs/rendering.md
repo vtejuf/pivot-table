@@ -150,6 +150,10 @@ DPR 已处理）交给 `draw(ctx, { layout, geometry, theme, options })`。核�
 `createCornerLabels()` 只是内置示例：在冻结角区画行/列维度名，角区为空时跳过，
 过窄时省略号截断。实际业务可以直接写自己的 `draw`。
 
+需要系统了解 `cellStyle`、`formatValue`、布局派生、overlay 与交互等挂载点时，
+见 [custom-features.md](custom-features.md)；`src/features/cell-marker.mjs` 是一个
+同时使用 `cellStyle` 和 `renderWithOverlay` 的完整自定义 feature 示例。
+
 ## 滚动条 feature
 
 `src/features/scrollbar.mjs` 在核心绘制后叠加悬浮滚动条，核心几何、可见范围
@@ -245,4 +249,6 @@ node --test test/model/*.test.mjs test/render/*.test.mjs \
 
 热力图颜色、浅色/深色文字和双度量分范围由 `test/features/heatmap.test.mjs`
 覆盖。滚动条几何、thumb 映射、命中测试、hover / active 绘制、透明度和自动隐藏
-状态机由 `test/features/scrollbar.test.mjs` 覆盖。
+状态机由 `test/features/scrollbar.test.mjs` 覆盖。自定义 feature 示例的谓词匹配、
+可见范围裁剪和样式由 `test/features/cell-marker.test.mjs` 覆盖；挂载点说明见
+[custom-features.md](custom-features.md)。

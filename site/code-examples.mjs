@@ -122,4 +122,21 @@ if (hit) {
   const next = scrollFromThumbPosition(hit.bar, y, grabOffset);
 }`,
   },
+  {
+    id: 'marker',
+    label: '自定义标记',
+    file: 'cell-marker.mjs',
+    note: 'test 谓词决定标记哪些格子；cellStyle 改底色，draw 画右上角标记。',
+    code: `import { renderWithOverlay } from './src/features/overlay.mjs';
+import { createCellMarker } from './src/features/cell-marker.mjs';
+
+const marker = createCellMarker(layout, {
+  test: (cell) => typeof cell.value === 'number' && cell.value >= 300,
+});
+
+renderWithOverlay(canvas, layout, {
+  viewport,
+  cellStyle: marker.cellStyle,
+}, marker.draw);`,
+  },
 ];

@@ -32,6 +32,7 @@ src/
   features/
     dual-measure.mjs   并列度量：度量作为最末列维度（附加功能）
     heatmap.mjs        热力图：通过 cellStyle 渲染，按 measure 分组色阶
+    cell-marker.mjs    自定义 feature 示例：cellStyle + overlay 标记高值
     overlay.mjs        自定义叠加：核心绘制后追加装饰（附角区示例）
     scrollbar.mjs      悬浮滚动条：轨道 / thumb 绘制 + 命中测试 + 拖拽换算
     totals.mjs         行/列小计/总计：统一上卷 + 双轴展示布局（支持多度量）
@@ -47,6 +48,7 @@ test/
   features/
     dual-measure.test.mjs  并列度量测试
     heatmap.test.mjs       热力图测试
+    cell-marker.test.mjs   自定义标记示例测试
     overlay.test.mjs       自定义叠加与角区示例测试
     scrollbar.test.mjs     悬浮滚动条几何、命中测试与拖拽换算
     totals.test.mjs        行/列小计/总计与多度量测试
@@ -71,6 +73,7 @@ docs/
   matrix-transform.md  矩阵推导与 cartesian/compact 差异
   rendering.md         Canvas 渲染管线与性能方案
   features-architecture.md  附加功能架构与边界
+  custom-features.md   自定义 feature 的挂载点与完整指南
   totals.md            行/列小计/总计设计与上卷规则
 ```
 
@@ -226,6 +229,9 @@ const { geometry, stats } = renderPivot(canvas, result, {
   `measure` 分别计算 min/max 和色阶，互不干扰；
 - **自定义叠加 feature**：`renderWithOverlay()` 在核心绘制后追加装饰，附角区
   维度名示例；Demo 扩展位可开关，核心几何与绘制顺序不变；
+- **自定义 feature 示例**：`createCellMarker()` 同时通过 `cellStyle` 和
+  `renderWithOverlay` 标记高值格子；挂载点与完整写法见
+  [docs/custom-features.md](docs/custom-features.md)；
 - **行/列小计/总计 feature**：`rollupTotals()` 统一上卷，多度量用
   `rollupMultiTotals()` 按 measure 分列；`withTotals()` 插入行/列、重建表头并
   填充交叉格；支持指定维度、末尾汇总，核心模型与渲染器不改；

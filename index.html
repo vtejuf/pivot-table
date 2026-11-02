@@ -442,6 +442,11 @@ y  =  [   3       1      0     0 ] · v</pre>
                 </label>
 
                 <label class="check">
+                  <input type="checkbox" data-demo-marker />
+                  <span>高值标记</span>
+                </label>
+
+                <label class="check">
                   <input type="checkbox" data-demo-overlay checked />
                   <span>角区标签</span>
                 </label>
@@ -480,7 +485,8 @@ y  =  [   3       1      0     0 ] · v</pre>
             自动隐藏，悬停或拖动时保持显示；<kbd>Shift</kbd> + 滚轮横向滚动；聚焦画布
             后可用方向键、<kbd>PageUp</kbd> / <kbd>PageDown</kbd>、<kbd>Home</kbd> /
             <kbd>End</kbd>。并列度量时，热力图和行/列汇总都按 measure 分列。角区标签
-            开关演示自定义叠加层；行/列小计与总计分别在 region、year 维度末尾插入汇总。
+            开关演示自定义叠加层；高值标记演示自定义 feature：cellStyle 改底色，
+            renderWithOverlay 画角标；行/列小计与总计分别在 region、year 维度末尾插入汇总。
           </p>
         </section>
 
@@ -833,6 +839,76 @@ node --test test/model/*.test.mjs test/render/*.test.mjs \
                     渲染与性能 <span aria-hidden="true">↗</span>
                   </a>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card custom-feature custom-feature--wide">
+            <div>
+              <h3>自定义 feature</h3>
+              <p class="muted">
+                核心不依赖 feature；选一个挂载点，写只读核心输出的函数。
+              </p>
+              <ol class="plan-list">
+                <li>
+                  <strong>选挂载点</strong>
+                  <span>渲染配置、渲染后叠加或布局派生。</span>
+                </li>
+                <li>
+                  <strong>写 createXxx()</strong>
+                  <span>返回 cellStyle、draw 或新的展示布局。</span>
+                </li>
+                <li>
+                  <strong>传给核心</strong>
+                  <span>renderPivot / renderWithOverlay，不修改核心。</span>
+                </li>
+              </ol>
+            </div>
+            <div>
+              <h4 class="custom-feature__title">挂载点文档</h4>
+              <div class="link-list custom-feature__links">
+                <a
+                  href="https://github.com/vtejuf/pivot-table/blob/dev/docs/custom-features.md#data"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  数据派生 <span aria-hidden="true">↗</span>
+                </a>
+                <a
+                  href="https://github.com/vtejuf/pivot-table/blob/dev/docs/custom-features.md#layout"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  布局派生 <span aria-hidden="true">↗</span>
+                </a>
+                <a
+                  href="https://github.com/vtejuf/pivot-table/blob/dev/docs/custom-features.md#render-config"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  cellStyle / formatValue / theme <span aria-hidden="true">↗</span>
+                </a>
+                <a
+                  href="https://github.com/vtejuf/pivot-table/blob/dev/docs/custom-features.md#overlay"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  renderWithOverlay <span aria-hidden="true">↗</span>
+                </a>
+                <a
+                  href="https://github.com/vtejuf/pivot-table/blob/dev/docs/custom-features.md#interaction"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  交互与命中测试 <span aria-hidden="true">↗</span>
+                </a>
+                <a
+                  href="https://github.com/vtejuf/pivot-table/blob/dev/docs/custom-features.md#cell-marker"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  完整 cell-marker 示例 <span aria-hidden="true">↗</span>
+                </a>
               </div>
             </div>
           </div>

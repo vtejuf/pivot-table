@@ -1527,6 +1527,27 @@ kbd {
   margin-bottom: 12px;
 }
 
+.custom-feature .plan-list {
+  margin-top: 12px;
+}
+
+.custom-feature--wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.75fr);
+  gap: 24px 40px;
+  margin-top: 20px;
+}
+
+.custom-feature__title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.custom-feature__links {
+  margin-top: 0;
+}
+
 .command {
   margin: 0 0 12px;
   border-radius: 10px;
@@ -1698,6 +1719,10 @@ kbd {
     border-left: 0;
     border-top: 1px dashed var(--line);
     padding: 12px 0 0;
+  }
+
+  .custom-feature--wide {
+    grid-template-columns: 1fr;
   }
 }
 
