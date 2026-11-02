@@ -69,7 +69,7 @@ renderPivot(canvas, layout, {
     id: 'totals',
     label: '行/列汇总',
     file: 'totals.mjs',
-    note: 'rollupTotals 读取 cube，withTotals 派生展示布局；渲染器无感知。',
+    note: 'rollupTotals 读取 cube，withTotals 派生展示布局；折叠父级可用 shouldIncludeSubtotal 跳过小计。',
     code: `import { layoutPivot } from './src/model/index.mjs';
 import { renderPivot } from './src/render/index.mjs';
 import { rollupTotals, withTotals } from './src/features/totals.mjs';
@@ -83,6 +83,7 @@ const base = layoutPivot(cube.rows, {
   dimensions,
   value: 'sales',
 });
+// 折叠场景：withTotals(base, rolled, { shouldIncludeSubtotal })
 const display = withTotals(base, rolled);
 
 renderPivot(canvas, display, { viewport });`,
@@ -161,6 +162,8 @@ const layout = layoutPivot(next.rows, {
 });
 
 // 并列度量：分别 collapseCube(salesCube) / collapseCube(countCube)，再 combineMeasures
+// 汇总：withTotals(base, rolled, { shouldIncludeSubtotal })
+// 多度量父维度：hitTestHeader(..., { canCollapse }) 屏蔽
 // pointerdown: hitTestHeader(layout, geometry, point)
 // renderWithOverlay: drawCollapseIndicators(ctx, { layout, geometry, collapsed })`,
   },

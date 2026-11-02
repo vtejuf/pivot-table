@@ -42,6 +42,8 @@ site/
   demo.mjs             主页 / 示例共用的 Demo 控制器
   code-examples.mjs    主页功能示例代码片段
   code-tabs.mjs        示例 tab 切换与复制
+  bench.mjs            主页基准表格渲染
+  depth.mjs            主页深度实验结果渲染
   styles.css           主页样式
 test/
   model/               聚合与布局测试

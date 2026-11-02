@@ -124,7 +124,7 @@ const layout = layoutPivot(next.rows, {
 });
 ```
 
-- 首版只支持 compact；可与行/列汇总、并列度量同时使用；cartesian 暂不叠加；
+- 当前只支持 compact；可与行/列汇总、并列度量同时使用；cartesian 暂不叠加；
 - 被折叠父成员的子维度显示为 `（全部）`，表示该父级的汇总；
 - 父表头命中用 `hitTestHeader()`，指示器用 `drawCollapseIndicators()`；
 - 折叠键用 `collapseKey(axis, dimension, value)` 生成，存进 Set 即可切换。
@@ -133,6 +133,7 @@ const layout = layoutPivot(next.rows, {
 `combineMeasures()` 的长表，否则 measure 维度会被一起替换：
 
 ```js
+import { layoutPivot } from './src/model/index.mjs';
 import { combineMeasures } from './src/features/dual-measure.mjs';
 import { collapseCube } from './src/features/collapse.mjs';
 

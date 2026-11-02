@@ -208,10 +208,11 @@ const next = scrollFromThumbPosition(hit.bar, y, grabOffset);
 - `collapseKey(axis, dimension, value)`：稳定的折叠键；
 - `collapseCube(cube, collapsed)`：把被折叠父成员的子维度替换为 `（全部）`，
   按度量重新上卷（avg 用 `__valueCount` 加权）；
-- `hitTestHeader(layout, geometry, point)`：命中行 / 列父表头；
-- `drawCollapseIndicators(ctx, { layout, geometry, collapsed })`：在父表头右侧
-  画 + / − 指示器；
-- 首版只支持 compact，可与行 / 列汇总、并列度量同时使用，折叠父级跳过小计、总计保留；
+- `hitTestHeader(layout, geometry, point, { canCollapse })`：命中行 / 列父表头；
+  `canCollapse` 可屏蔽不具备折叠语义的维度；
+- `drawCollapseIndicators(ctx, { layout, geometry, collapsed, canCollapse })`：在父表头右侧
+  画 + / − 指示器；多度量下屏蔽 `measure` 及其直接父维度；
+- 当前只支持 compact，可与行 / 列汇总、并列度量同时使用，折叠父级跳过小计、总计保留；
   多度量时对每个 measure 的 cube 分别 collapseCube，再 combineMeasures；
   measure 及其直接父维度不参与折叠，用 `canCollapse` 过滤；
   暂不支持 cartesian：它会为每个父级补齐全局子成员；
@@ -249,6 +250,7 @@ Canvas 内容对辅助技术不可见。生产环境建议同时提供语义化�
 - `cellStyle` / `formatValue` 是同步回调，逐格调用；大表上应保持轻量。
 - compact 模式没有全局固定矩阵，但渲染只依赖表头的 `offset / size`，
   因此两种布局共用同一个渲染器。
+- 折叠只支持 compact；cartesian 的全局成员补齐与折叠语义冲突。
 
 ## 验证
 

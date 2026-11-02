@@ -64,7 +64,11 @@ test/
     heatmap.test.mjs       已实现
     cell-marker.test.mjs   已实现
     collapse.test.mjs      已实现
+    overlay.test.mjs       已实现
     scrollbar.test.mjs     已实现
+    totals.test.mjs        已实现
+  site/
+    code-examples.test.mjs 已实现
   architecture.test.mjs    已实现：依赖方向守卫
 ```
 
@@ -168,10 +172,12 @@ renderer 的绘制路径。
 `src/features/collapse.mjs` 在 aggregate 之后派生折叠数据，核心布局 / 渲染不改：
 
 - `collapseCube(cube, collapsed)`：按 `collapseKey(axis, dimension, value)` 找到第一个被折叠的父成员，把其子维度替换为 `（全部）`，并按度量重新上卷；avg 用 `__valueCount` 加权；
-- `hitTestHeader(layout, geometry, point)`：命中行 / 列父表头，返回 `axis / dimension / value / key`；
-- `drawCollapseIndicators(ctx, { layout, geometry, collapsed })`：在父表头右侧画 + / −；
+- `hitTestHeader(layout, geometry, point, { canCollapse })`：命中行 / 列父表头，
+  返回 `axis / dimension / value / key`；
+- `drawCollapseIndicators(ctx, { layout, geometry, collapsed, canCollapse })`：
+  在父表头右侧画 + / −；多度量下屏蔽 `measure` 及其直接父维度；
 - Demo“折叠模式”开启后点击父表头切换，关闭时清除状态并恢复完整布局；
-- 首版只支持 compact；可与行/列汇总、并列度量同时使用，折叠父级跳过小计、总计保留；
+- 当前只支持 compact；可与行/列汇总、并列度量同时使用，折叠父级跳过小计、总计保留；
   多度量时对每个 measure 的 cube 分别折叠，再 combineMeasures；
   measure 及其直接父维度不参与折叠，用 `canCollapse` 过滤；cartesian 暂不叠加；
 - 测试见 `test/features/collapse.test.mjs`；完整挂载点说明见
@@ -271,13 +277,13 @@ site / examples / bench
 
 ## 8. 非目标
 
-本次设计不包含：
+当前仍不包含：
 
-- 预先创建无实现内容的目录；
-- 实现小计 / 总计；
-- 实现折叠 / 展开；
-- 修改核心矩阵/几何算法或默认渲染行为（已完成的 heatmap 迁出除外）；
+- 真正的跨层单格合并；
+- 修改核心矩阵 / 几何算法或默认渲染行为；
 - 引入插件注册器、事件总线或新的运行时依赖。
+
+小计 / 总计、折叠 / 展开已在后续迭代落地，见 3.4 / 3.7。
 
 ## 9. 未来落地顺序
 

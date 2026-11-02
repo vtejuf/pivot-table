@@ -126,7 +126,7 @@
             <p class="eyebrow">02 · pipeline</p>
             <h2>一条核心数据流，一组扩展挂载点</h2>
             <p>
-              聚合、布局、几何、渲染各自独立；内置 feature 挂在阶段之间或渲染之后，
+              聚合、布局、几何、渲染各自独立；内置 / 示例 feature 挂在阶段之间或渲染之后，
               新增能力也复用同一组挂载点。
             </p>
           </header>
@@ -137,7 +137,7 @@
                 <i aria-hidden="true"></i>核心阶段
               </span>
               <span class="flow__legend-item flow__legend-item--feature">
-                <i aria-hidden="true"></i>内置 feature
+                <i aria-hidden="true"></i>内置 / 示例 feature
               </span>
               <span class="flow__legend-item flow__legend-item--extension">
                 <i aria-hidden="true"></i>可挂载扩展点
@@ -162,7 +162,7 @@
                 <div class="flow__mounts">
                   <span class="flow__mount-label">挂载点</span>
                   <span class="flow__chip flow__chip--extension">
-                    <strong>过滤 / 排序 / 折叠</strong>· 预处理（规划中）
+                    <strong>过滤 / 排序</strong>· 预处理（规划中）
                   </span>
                 </div>
               </li>
@@ -267,6 +267,9 @@
                   <span class="flow__chip flow__chip--feature">
                     <strong>scrollbar</strong>· 渲染后叠加 + 自动隐藏
                   </span>
+                  <span class="flow__chip flow__chip--feature">
+                    <strong>cell-marker</strong>· 示例 feature（cellStyle + overlay）
+                  </span>
                   <span class="flow__chip flow__chip--extension">
                     <strong>formatValue / theme</strong>· 渲染配置
                   </span>
@@ -277,7 +280,7 @@
             <div class="flow__loop">
               <span class="flow__loop-label">交互回路</span>
               <span><code>scrollX / scrollY</code> 变化 → 重新计算几何 → 重绘</span>
-              <span>命中测试 / 下钻 → 重新进入 <code>aggregate</code> 或 <code>layoutPivot</code></span>
+              <span>命中测试 / 折叠 / 下钻 → 重入 <code>collapseCube</code>、<code>aggregate</code> 或 <code>layoutPivot</code></span>
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 # 行 / 列小计与总计（设计稿）
 
 - **状态**：行/列小计、行/列总计、双轴交叉和多度量分列已实现；折叠联动（单/多度量）已实现（折叠父级跳过小计、总计保留），真正的跨层单格合并、表头样式后续。
-- **日期**：2026-11-01
+- **日期**：2026-11-02
 - **原则**：核心 `aggregate` / `layoutPivot` / `renderPivot` 冻结；采用路线 B
   （展示布局派生）；聚合运算和布局插入分离。
 
@@ -168,7 +168,8 @@ const reduce = (records, context) => ({
 - 折叠联动：`withTotals()` 的 `shouldIncludeSubtotal` 可让折叠父级跳过小计，
   总计保留；上卷使用折叠后的 cube，保证折叠占位行/列的交叉格有值。
   多度量时每个 measure 的 cube 分别折叠并上卷，再合并。
-  真正的单格跨层合并、表头样式仍未实现。
+  真正的单格跨层合并、表头样式仍未实现；折叠实现见
+  [custom-features.md](custom-features.md#collapse)。
 
 ## 6. 测试
 
@@ -179,11 +180,11 @@ const reduce = (records, context) => ({
   多度量列槽按 measure 展开、两块表头的 size 不变量、交叉格、纯列透视、
   `cellMap`、`size`、`matrix = null`、`toPixel()`。
 - 渲染：fake context 下出现行/列“小计”“总计”文本，绘制格数增加。
-- 站点：DOM 桩确认四个开关组合、双度量禁用和状态文案。
+- 站点：Demo 的四个汇总开关组合、折叠联动（跳过折叠父级小计）和状态文案做运行验证。
 
 ## 7. 后续
 
 1. 可选的真正跨层表头合并（核心 `depthSpan` 或 overlay）。
 2. 表头样式（overlay 或核心 `headerCellStyle` 扩展）。
 3. 折叠联动（单/多度量）已实现：折叠父级跳过小计、总计保留，上卷使用折叠后的
-   cube；后续扩展 cartesian。
+   cube；剩余 cartesian 折叠。
