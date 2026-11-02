@@ -1,4 +1,5 @@
 import { createPivotDemo } from './demo.mjs';
+import { initCodeExamples } from './code-tabs.mjs';
 import { renderBenchmark } from './bench.mjs';
 import { renderDepthExperiment } from './depth.mjs';
 
@@ -64,6 +65,8 @@ try {
     target.textContent = `Demo 初始化失败：${error.message}`;
   }
 }
+
+initCodeExamples();
 
 renderBenchmark();
 renderDepthExperiment();

@@ -1383,6 +1383,109 @@ kbd {
 /* Quickstart                                                                 */
 /* ------------------------------------------------------------------------- */
 
+.code-tabs {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.code-tabs__list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.code-tabs__tab {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  padding: 6px 12px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.code-tabs__tab:hover {
+  border-color: #bfdbfe;
+  color: var(--ink);
+}
+
+.code-tabs__tab[aria-selected="true"] {
+  border-color: #bfdbfe;
+  background: var(--accent-soft);
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.code-tabs__tab:focus-visible,
+.code-card__copy:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.code-tabs__panel {
+  min-width: 0;
+}
+
+.code-tabs__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.code-card__copy {
+  border: 1px solid rgb(148 163 184 / 0.28);
+  border-radius: 6px;
+  background: rgb(148 163 184 / 0.12);
+  padding: 2px 8px;
+  color: #dbeafe;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.code-card__copy:hover {
+  border-color: rgb(147 197 253 / 0.6);
+  background: rgb(148 163 184 / 0.2);
+}
+
+.code-card__copy-status {
+  min-width: 3.5em;
+  color: #93c5fd;
+  font-size: 11px;
+  text-align: right;
+}
+
+.code-tabs__note {
+  margin: 0;
+  border-top: 1px solid rgb(148 163 184 / 0.16);
+  padding: 9px 18px;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.code-tabs__fallback {
+  margin: 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: #f8fafc;
+  padding: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .code-card {
   overflow: hidden;
   border-radius: var(--radius);

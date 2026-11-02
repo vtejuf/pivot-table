@@ -232,7 +232,7 @@ Canvas 内容对辅助技术不可见。生产环境建议同时提供语义化�
 
 ```bash
 node --test test/model/*.test.mjs test/render/*.test.mjs \
-  test/features/*.test.mjs test/architecture.test.mjs
+  test/features/*.test.mjs test/site/*.test.mjs test/architecture.test.mjs
 ```
 
 渲染测试使用一个记录调用的 fake 2D context，覆盖：

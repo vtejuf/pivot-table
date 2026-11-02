@@ -38,6 +38,8 @@ src/
 site/
   main.mjs             主页导航与 Demo 初始化
   demo.mjs             主页 / 示例共用的 Demo 控制器
+  code-examples.mjs    主页功能示例代码片段
+  code-tabs.mjs        示例 tab 切换与复制
   styles.css           主页样式
 test/
   model/               聚合与布局测试
@@ -48,6 +50,8 @@ test/
     overlay.test.mjs       自定义叠加与角区示例测试
     scrollbar.test.mjs     悬浮滚动条几何、命中测试与拖拽换算
     totals.test.mjs        行/列小计/总计与多度量测试
+  site/
+    code-examples.test.mjs 示例覆盖与模块路径校验
   architecture.test.mjs    核心不反向依赖 features
 examples/
   demo.mjs             终端输出布局结果
@@ -76,7 +80,7 @@ docs/
 # Node：模型示例与测试
 node examples/demo.mjs
 node --test test/model/*.test.mjs test/render/*.test.mjs \
-  test/features/*.test.mjs test/architecture.test.mjs
+  test/features/*.test.mjs test/site/*.test.mjs test/architecture.test.mjs
 
 # 基准测试（写 bench/results.json）
 node bench/run.mjs

@@ -782,39 +782,25 @@ y  =  [   3       1      0     0 ] · v</pre>
           <header class="section__head">
             <p class="eyebrow">08 · quickstart</p>
             <h2>直接使用</h2>
-            <p>没有构建步骤，没有运行时依赖。模型和渲染都是原生 ES Modules。</p>
+            <p>没有构建步骤，没有运行时依赖。下面按 Demo 功能提供最小调用片段，可直接复制。</p>
           </header>
 
           <div class="split split--top">
-            <div class="code-card">
-              <div class="code-card__bar">
-                <span>app.mjs</span>
-                <span>ES Module</span>
-              </div>
-              <pre><code>import { aggregate, layoutPivot } from './src/model/index.mjs';
-import { renderPivot } from './src/render/index.mjs';
-
-const cube = aggregate(rows, {
-  dimensions,
-  measure: { key: 'sales', aggregate: 'sum' },
-});
-
-const layout = layoutPivot(cube.rows, {
-  dimensions,
-  value: 'sales',
-});
-
-renderPivot(canvas, layout, {
-  viewport: { width: 960, height: 540 },
-  heatmap: true,
-});</code></pre>
+            <div class="code-tabs" data-code-examples>
+              <noscript>
+                <p class="code-tabs__fallback">
+                  示例需要启用 JavaScript；也可以直接查看
+                  <a href="https://github.com/vtejuf/pivot-table/blob/dev/site/demo.mjs">site/demo.mjs</a>。
+                </p>
+              </noscript>
             </div>
 
             <div class="quickstart__side">
               <div class="card">
                 <h3>本地运行</h3>
                 <pre class="command">node examples/demo.mjs
-node --test test/model/*.test.mjs test/render/*.test.mjs</pre>
+node --test test/model/*.test.mjs test/render/*.test.mjs \
+  test/features/*.test.mjs test/site/*.test.mjs</pre>
                 <p class="muted">
                   浏览器示例需要通过 HTTP 打开，ES module 不能走 <code>file://</code>。
                 </p>
