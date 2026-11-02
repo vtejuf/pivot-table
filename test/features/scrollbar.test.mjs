@@ -4,6 +4,7 @@ import { aggregate, layoutPivot } from '../../src/model/index.mjs';
 import { computePivotGeometry } from '../../src/render/index.mjs';
 import {
   computeScrollbarGeometry,
+  createScrollbarAutoHide,
   createScrollbarOverlay,
   drawScrollbars,
   hitTestScrollbars,
@@ -42,6 +43,7 @@ function createFakeContext() {
   const calls = [];
   const ctx = {
     fillStyle: '#000000',
+    globalAlpha: 1,
     save() {
       calls.push({ op: 'save' });
     },
@@ -49,7 +51,12 @@ function createFakeContext() {
       calls.push({ op: 'restore' });
     },
     fillRect(...args) {
-      calls.push({ op: 'fillRect', args, fillStyle: ctx.fillStyle });
+      calls.push({
+        op: 'fillRect',
+        args,
+        fillStyle: ctx.fillStyle,
+        globalAlpha: ctx.globalAlpha,
+      });
     },
   };
   return { ctx, calls };
@@ -243,6 +250,7 @@ test('createScrollbarOverlay 缓存几何并提供 hover / active 状态', () =>
   const bars = overlay.draw(ctx, { geometry: makeGeometry() });
   assert.equal(bars.thickness, 8);
   assert.equal(overlay.getGeometry().vertical.track.width, 8);
+  assert.equal(overlay.opacity, 1);
 
   const hit = overlay.hitTest(680, 100);
   assert.equal(hit.axis, 'y');
@@ -263,6 +271,81 @@ test('createScrollbarOverlay 缓存几何并提供 hover / active 状态', () =>
   overlay.setActive(null);
   assert.equal(overlay.hover, null);
   assert.equal(overlay.active, null);
+});
+
+test('opacity 控制滚动条淡出，0 时完全不绘制', () => {
+  const { ctx, calls } = createFakeContext();
+
+  drawScrollbars(ctx, makeGeometry(), {}, { opacity: 0.5 });
+  let fills = calls.filter((call) => call.op === 'fillRect');
+  assert.equal(fills.length, 4);
+  assert.ok(fills.every((fill) => fill.globalAlpha === 0.5));
+
+  calls.length = 0;
+  drawScrollbars(ctx, makeGeometry(), {}, { opacity: 0 });
+  assert.equal(calls.filter((call) => call.op === 'fillRect').length, 0);
+  assert.equal(calls.filter((call) => call.op === 'save').length, 0);
+
+  calls.length = 0;
+  drawScrollbars(ctx, makeGeometry(), {}, { opacity: 2 });
+  fills = calls.filter((call) => call.op === 'fillRect');
+  assert.ok(fills.every((fill) => fill.globalAlpha === 1));
+});
+
+test('overlay 的 setOpacity 影响绘制并 clamp 到 0..1', () => {
+  const overlay = createScrollbarOverlay();
+  const { ctx, calls } = createFakeContext();
+
+  overlay.setOpacity(0.25);
+  assert.equal(overlay.opacity, 0.25);
+  overlay.draw(ctx, { geometry: makeGeometry() });
+  let fills = calls.filter((call) => call.op === 'fillRect');
+  assert.ok(fills.every((fill) => fill.globalAlpha === 0.25));
+
+  overlay.setOpacity(2);
+  assert.equal(overlay.opacity, 1);
+  overlay.setOpacity(Number.NaN);
+  assert.equal(overlay.opacity, 0);
+});
+
+test('createScrollbarAutoHide 按 delay 与 fadeDuration 计算透明度', () => {
+  const autoHide = createScrollbarAutoHide({ delay: 900, fadeDuration: 160 });
+
+  assert.equal(autoHide.opacity(0), 0);
+  assert.equal(autoHide.isActive(0), false);
+
+  autoHide.show(1000);
+  assert.equal(autoHide.opacity(1000), 1);
+  assert.equal(autoHide.opacity(1500), 1);
+  assert.equal(autoHide.opacity(1900), 1); // elapsed 900，刚开始淡出
+  closeTo(autoHide.opacity(1980), 0.5, '淡出中点');
+  assert.equal(autoHide.opacity(2060), 0);
+  assert.equal(autoHide.opacity(3000), 0);
+  assert.equal(autoHide.isActive(1980), true);
+  assert.equal(autoHide.isActive(2060), false);
+
+  autoHide.setPinned(true, 3000);
+  assert.equal(autoHide.opacity(9999), 1);
+  autoHide.setPinned(false, 9999);
+  assert.equal(autoHide.opacity(9999), 1);
+  assert.equal(autoHide.opacity(9999 + 900), 1);
+  assert.equal(autoHide.opacity(9999 + 1060), 0);
+});
+
+test('createScrollbarAutoHide 参数校验与零时长', () => {
+  assert.throws(
+    () => createScrollbarAutoHide({ delay: -1 }),
+    /delay/,
+  );
+  assert.throws(
+    () => createScrollbarAutoHide({ fadeDuration: -1 }),
+    /fadeDuration/,
+  );
+
+  const instant = createScrollbarAutoHide({ delay: 0, fadeDuration: 0 });
+  instant.show(10);
+  assert.equal(instant.opacity(10), 1);
+  assert.equal(instant.opacity(10.001), 0);
 });
 
 test('参数校验：非法几何与尺寸直接报错', () => {

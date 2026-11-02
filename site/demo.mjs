@@ -21,6 +21,7 @@
  * cellStyle 提供；双度量时按 measure 分别计算色阶。
  *
  * 滚动条始终启用：由 features/scrollbar.mjs 在核心绘制后叠加，无需控件。
+ * 交互后显示，停止操作约 900ms 后淡出；悬停或拖动滚动条时固定显示。
  * 指针命中滚动条时优先拖动滚动条，其余区域继续拖拽平移；滚轮、方向键和
  * 滚动条最终都写回 scrollX / scrollY，然后统一重绘。
  *
@@ -38,6 +39,7 @@ import {
   renderWithOverlay,
 } from '../src/features/overlay.mjs';
 import {
+  createScrollbarAutoHide,
   createScrollbarOverlay,
   scrollFromThumbPosition,
 } from '../src/features/scrollbar.mjs';
@@ -52,6 +54,17 @@ import { salesCube, countCube } from '../examples/sample-data.mjs';
 
 const DEFAULT_CELL_WIDTH = 104;
 const DEFAULT_HEIGHT = 560;
+/** 自动隐藏后不再响应 pointerdown，避免误触不可见的滚动条。 */
+const SCROLLBAR_HIT_OPACITY = 0.05;
+
+const requestFrame =
+  typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame
+    : (callback) => setTimeout(callback, 16);
+const cancelFrame =
+  typeof cancelAnimationFrame === 'function'
+    ? cancelAnimationFrame
+    : clearTimeout;
 
 export function createPivotDemo(root = document, options = {}) {
   const scope = root ?? document;
@@ -112,6 +125,9 @@ export function createPivotDemo(root = document, options = {}) {
   let hoverAxis = null;
   const cornerLabels = createCornerLabels();
   const scrollbarOverlay = createScrollbarOverlay();
+  const autoHide = createScrollbarAutoHide();
+  let scrollbarTimer = 0;
+  let scrollbarFrame = 0;
   const cleanups = [];
 
   const listen = (target, type, handler, listenerOptions) => {
@@ -248,10 +264,68 @@ export function createPivotDemo(root = document, options = {}) {
         hoverAxis = null;
         scrollbarOverlay.setHover(null);
         canvas.classList.remove('is-scrollbar-hover');
+        unpinScrollbars();
       }
     }
 
     updateStatus(cellWidth, stats);
+  }
+
+  function clearScrollbarTimers() {
+    if (scrollbarTimer) {
+      clearTimeout(scrollbarTimer);
+      scrollbarTimer = 0;
+    }
+    if (scrollbarFrame) {
+      cancelFrame(scrollbarFrame);
+      scrollbarFrame = 0;
+    }
+  }
+
+  function startScrollbarFade() {
+    cancelFrame(scrollbarFrame);
+    scrollbarFrame = 0;
+    if (autoHide.pinned) return;
+
+    const step = () => {
+      scrollbarFrame = 0;
+      const opacity = autoHide.opacity();
+      scrollbarOverlay.setOpacity(opacity);
+      render();
+
+      if (opacity > 0) {
+        scrollbarFrame = requestFrame(step);
+      }
+    };
+    step();
+  }
+
+  function scheduleScrollbarHide() {
+    if (scrollbarTimer || autoHide.pinned) return;
+
+    scrollbarTimer = setTimeout(() => {
+      scrollbarTimer = 0;
+      startScrollbarFade();
+    }, autoHide.delay);
+  }
+
+  function revealScrollbars() {
+    clearScrollbarTimers();
+    autoHide.show();
+    scrollbarOverlay.setOpacity(1);
+    scheduleScrollbarHide();
+  }
+
+  function pinScrollbars() {
+    clearScrollbarTimers();
+    autoHide.setPinned(true);
+    scrollbarOverlay.setOpacity(1);
+  }
+
+  function unpinScrollbars() {
+    if (!autoHide.pinned) return;
+    autoHide.setPinned(false);
+    scheduleScrollbarHide();
   }
 
   function updateStatus(cellWidth, stats) {
@@ -295,6 +369,7 @@ export function createPivotDemo(root = document, options = {}) {
   listen(colTotalInput, 'change', () => rebuildLayout());
   listen(widthInput, 'input', render);
   listen(resetButton, 'click', () => {
+    revealScrollbars();
     scrollX = 0;
     scrollY = 0;
     render();
@@ -305,6 +380,7 @@ export function createPivotDemo(root = document, options = {}) {
     'wheel',
     (event) => {
       event.preventDefault();
+      revealScrollbars();
       const unit = event.deltaMode === 1 ? 16 : 1;
       scrollX += (event.shiftKey ? event.deltaY : event.deltaX) * unit;
       scrollY += (event.shiftKey ? 0 : event.deltaY) * unit;
@@ -356,6 +432,8 @@ export function createPivotDemo(root = document, options = {}) {
     hoverAxis = axis;
     scrollbarOverlay.setHover(axis);
     canvas.classList.toggle('is-scrollbar-hover', Boolean(axis));
+    if (axis) pinScrollbars();
+    else unpinScrollbars();
     render();
   }
 
@@ -370,7 +448,7 @@ export function createPivotDemo(root = document, options = {}) {
       ? scrollbarOverlay.hitTest(point.x, point.y, lastGeometry)
       : null;
 
-    if (hit) {
+    if (hit && scrollbarOverlay.opacity > SCROLLBAR_HIT_OPACITY) {
       const thumbStart = hit.axis === 'y' ? hit.bar.thumb.y : hit.bar.thumb.x;
       scrollbarDrag = {
         pointerId: event.pointerId,
@@ -381,13 +459,16 @@ export function createPivotDemo(root = document, options = {}) {
             : hit.bar.thumbLength / 2,
       };
       scrollbarOverlay.setActive(hit.axis);
+      pinScrollbars();
       canvas.classList.add('is-scrollbar-dragging');
       canvas.setPointerCapture?.(event.pointerId);
       event.preventDefault();
       if (hit.part === 'track') applyScrollbarDrag(point);
+      else render();
       return;
     }
 
+    revealScrollbars();
     drag = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -397,6 +478,7 @@ export function createPivotDemo(root = document, options = {}) {
     };
     canvas.setPointerCapture?.(event.pointerId);
     canvas.classList.add('is-dragging');
+    render();
   });
 
   listen(canvas, 'pointermove', (event) => {
@@ -407,6 +489,7 @@ export function createPivotDemo(root = document, options = {}) {
 
     if (drag) {
       if (drag.pointerId !== event.pointerId) return;
+      revealScrollbars();
       scrollX = drag.scrollX - (event.clientX - drag.startX);
       scrollY = drag.scrollY - (event.clientY - drag.startY);
       render();
@@ -419,11 +502,13 @@ export function createPivotDemo(root = document, options = {}) {
   });
 
   listen(canvas, 'pointerleave', () => {
-    if (scrollbarDrag || hoverAxis === null) return;
+    if (scrollbarDrag) return;
+    const hadHover = hoverAxis !== null;
     hoverAxis = null;
     scrollbarOverlay.setHover(null);
     canvas.classList.remove('is-scrollbar-hover');
-    render();
+    unpinScrollbars();
+    if (hadHover) render();
   });
 
   const endDrag = (event) => {
@@ -436,6 +521,22 @@ export function createPivotDemo(root = document, options = {}) {
       scrollbarDrag = null;
       scrollbarOverlay.setActive(null);
       canvas.classList.remove('is-scrollbar-dragging');
+
+      const point = canvasPoint(event);
+      const hit = lastGeometry
+        ? scrollbarOverlay.hitTest(point.x, point.y, lastGeometry)
+        : null;
+      if (hit) {
+        hoverAxis = hit.axis;
+        scrollbarOverlay.setHover(hit.axis);
+        canvas.classList.add('is-scrollbar-hover');
+        pinScrollbars();
+      } else {
+        hoverAxis = null;
+        scrollbarOverlay.setHover(null);
+        canvas.classList.remove('is-scrollbar-hover');
+        unpinScrollbars();
+      }
       render();
     }
     if (endsPan) {
@@ -488,6 +589,7 @@ export function createPivotDemo(root = document, options = {}) {
     }
 
     event.preventDefault();
+    revealScrollbars();
     render();
   });
 
@@ -502,10 +604,15 @@ export function createPivotDemo(root = document, options = {}) {
   if (dualInput) syncDualControls(isDual());
   rebuildLayout();
 
+  if (lastGeometry?.viewport.canScrollX || lastGeometry?.viewport.canScrollY) {
+    revealScrollbars();
+  }
+
   return {
     render,
     rebuild: rebuildLayout,
     destroy() {
+      clearScrollbarTimers();
       while (cleanups.length > 0) cleanups.pop()();
     },
     get layout() {

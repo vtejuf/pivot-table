@@ -215,6 +215,7 @@ const { geometry, stats } = renderPivot(canvas, result, {
 - 多层行 / 列表头，滚动时冻结在视口边缘；
 - **滚动条 feature**：`createScrollbarOverlay()` 在核心绘制后叠加悬浮滚动条，
   提供 thumb 命中测试与拖拽换算；轨道避开冻结表头，内容不足时自动隐藏；
+  交互后显示、停止操作后淡出，悬停或拖动时保持显示；
 - 视口虚拟化，只遍历并绘制可见单元格，网格线批量描边；
 - **并列度量**：feature 层把度量作为列轴最末维度，Demo 扩展位可开关；
 - **热力图 feature**：通过 `cellStyle` 渲染；单度量共用一个范围，双度量按

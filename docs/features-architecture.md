@@ -137,12 +137,17 @@ renderer 的绘制路径。
 - `hitTestScrollbars(bars, x, y)`：区分 thumb / track，轨道外返回 `null`；
 - `scrollFromThumbPosition(bar, pointer, grabOffset)`：把指针位置换算回滚动偏移；
 - `drawScrollbars(ctx, geometry, options, state)`：绘制轨道和 thumb，支持
-  hover / active 颜色；
+  hover / active 颜色和 `opacity` 淡出；
 - `createScrollbarOverlay(options)`：封装成 overlay 的 draw 函数，并缓存最近一次
   几何供站点层命中测试；
+- `createScrollbarAutoHide({ delay, fadeDuration })`：纯时间状态机，提供
+  `show()` / `setPinned()` / `opacity()` / `isActive()`，不依赖 DOM；
 - 轨道从数据区起点开始，避开冻结表头；两个方向都可滚动时右下角留空；内容
   不足一个视口时自动隐藏；
-- Demo 始终启用；指针命中滚动条时优先拖动滚动条，否则继续拖拽平移。
+- Demo 默认启用；滚动 / 拖动后显示，停止操作约 900ms 后淡出，悬停或拖动
+  滚动条时保持显示；自动隐藏后仍可命中用于悬停唤醒，但 pointerdown 仅在
+  透明度大于 0.05 时拖动滚动条；
+- Demo 中指针命中滚动条时优先拖动滚动条，否则继续拖拽平移。
 
 ## 4. 依赖规则
 

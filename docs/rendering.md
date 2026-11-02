@@ -172,12 +172,20 @@ const next = scrollFromThumbPosition(hit.bar, y, grabOffset);
   `canScrollX / canScrollY` 为 false 时整条滚动条自动隐藏；
 - `hitTest` 区分 thumb / track；点击轨道时用 `thumbLength / 2` 作为
   `grabOffset`，thumb 中心会跳到点击位置；
-- `drawScrollbars()` 接受 `{ hover, active }` 状态，用不同颜色表达悬停和拖动；
+- `drawScrollbars()` 接受 `{ hover, active, opacity }` 状态，用不同颜色表达
+  悬停 / 拖动，并通过 `globalAlpha` 支持淡出；
+- `createScrollbarAutoHide({ delay, fadeDuration })` 是纯时间状态机：滚动 /
+  拖动时 `show()`，悬停或拖动滚动条时 `setPinned(true)`，用 `opacity(now)`
+  取当前透明度；`site/demo.mjs` 用 `setTimeout` + `requestAnimationFrame`
+  驱动淡出并在透明度变化时重绘；
+- 自动隐藏后滚动条仍可命中，用于悬停唤醒；Demo 在 `opacity <= 0.05` 时把
+  pointerdown 当作画布平移，避免误触不可见的滚动条；
 - 覆盖式绘制会占用视口右缘 / 下缘约 13px，不修改核心 `dataClip`、`visible`
   或布局对象。
 
-`site/demo.mjs` 已经接入：指针命中滚动条时优先拖动滚动条，其余区域继续拖拽
-平移；滚轮、方向键和滚动条最终都写回 `scrollX / scrollY`。
+`site/demo.mjs` 已经接入：交互后显示滚动条，停止操作约 900ms 后淡出；指针
+悬停或拖动滚动条时保持显示；指针命中滚动条时优先拖动滚动条，其余区域继续
+拖拽平移；滚轮、方向键和滚动条最终都写回 `scrollX / scrollY`。
 
 ## 行 / 列小计与总计布局
 
@@ -236,5 +244,5 @@ node --test test/model/*.test.mjs test/render/*.test.mjs \
 - 传 canvas 时按 DPR 设置物理尺寸。
 
 热力图颜色、浅色/深色文字和双度量分范围由 `test/features/heatmap.test.mjs`
-覆盖。滚动条几何、thumb 映射、命中测试和 hover / active 绘制由
-`test/features/scrollbar.test.mjs` 覆盖。
+覆盖。滚动条几何、thumb 映射、命中测试、hover / active 绘制、透明度和自动隐藏
+状态机由 `test/features/scrollbar.test.mjs` 覆盖。

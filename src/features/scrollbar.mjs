@@ -22,6 +22,12 @@
  *     const next = scrollFromThumbPosition(hit.bar, y, grabOffset);
  *
  * thumb 的几何映射只依赖视口、内容尺寸和 maxScroll，不修改 layout / geometry。
+ *
+ * 自动隐藏分两层：
+ * - drawScrollbars() / createScrollbarOverlay() 只负责透明度绘制；
+ * - createScrollbarAutoHide() 是纯时间状态机，由调用方用 setTimeout /
+ *   requestAnimationFrame 驱动，并在透明度变化时重绘。
+ * 这样 feature 不依赖 DOM，计时器和动画仍留在 site 层。
  */
 
 export const DEFAULT_SCROLLBAR_THEME = Object.freeze({
@@ -37,6 +43,13 @@ export const DEFAULT_SCROLLBAR_THEME = Object.freeze({
   thumbColor: 'rgba(71, 85, 105, 0.45)',
   thumbHoverColor: 'rgba(51, 65, 85, 0.66)',
   thumbActiveColor: 'rgba(37, 99, 235, 0.75)',
+});
+
+export const DEFAULT_SCROLLBAR_AUTO_HIDE = Object.freeze({
+  /** 交互结束后保持可见的时间（毫秒）。 */
+  delay: 900,
+  /** 淡出时长（毫秒）。 */
+  fadeDuration: 160,
 });
 
 /**
@@ -227,7 +240,8 @@ export function scrollFromThumbPosition(bar, pointerPosition, grabOffset = 0) {
  * @param {CanvasRenderingContext2D} ctx
  * @param {object} geometry
  * @param {object} options 与 computeScrollbarGeometry 相同的尺寸选项，外加颜色
- * @param {{ hover?: 'x' | 'y' | null, active?: 'x' | 'y' | null }} state
+ * @param {{ hover?: 'x' | 'y' | null, active?: 'x' | 'y' | null, opacity?: number }} state
+ *   opacity 为 0..1，缺省按 1 处理；0 时直接跳过绘制。
  * @returns {ReturnType<typeof computeScrollbarGeometry>}
  */
 export function drawScrollbars(ctx, geometry, options = {}, state = {}) {
@@ -237,13 +251,15 @@ export function drawScrollbars(ctx, geometry, options = {}, state = {}) {
 
   const bars = computeScrollbarGeometry(geometry, options);
   const style = resolveStyle(options);
+  const opacity = clampOpacity(state.opacity);
   const visibleBars = [bars.vertical, bars.horizontal].filter(
     (bar) => bar.visible,
   );
-  if (visibleBars.length === 0) return bars;
+  if (visibleBars.length === 0 || opacity <= 0) return bars;
 
   ctx.save();
   try {
+    ctx.globalAlpha = opacity;
     for (const bar of visibleBars) {
       if (style.trackColor) {
         ctx.fillStyle = style.trackColor;
@@ -283,15 +299,18 @@ export function drawScrollbars(ctx, geometry, options = {}, state = {}) {
  *   draw: (ctx: CanvasRenderingContext2D, context: object) => object | null,
  *   setHover: (axis: 'x' | 'y' | null) => void,
  *   setActive: (axis: 'x' | 'y' | null) => void,
+ *   setOpacity: (opacity: number) => void,
  *   getGeometry: (geometry?: object) => object | null,
  *   hitTest: (x: number, y: number, geometry?: object) => object | null,
  *   hover: 'x' | 'y' | null,
- *   active: 'x' | 'y' | null
+ *   active: 'x' | 'y' | null,
+ *   opacity: number
  * }}
  */
 export function createScrollbarOverlay(options = {}) {
   let hover = null;
   let active = null;
+  let opacity = 1;
   let lastGeometry = null;
 
   const getGeometry = (geometry = lastGeometry) =>
@@ -306,13 +325,20 @@ export function createScrollbarOverlay(options = {}) {
     draw(ctx, context = {}) {
       lastGeometry = context.geometry ?? null;
       if (!lastGeometry) return null;
-      return drawScrollbars(ctx, lastGeometry, options, { hover, active });
+      return drawScrollbars(ctx, lastGeometry, options, {
+        hover,
+        active,
+        opacity,
+      });
     },
     setHover(axis) {
       hover = normalizeAxis(axis);
     },
     setActive(axis) {
       active = normalizeAxis(axis);
+    },
+    setOpacity(value) {
+      opacity = clampOpacity(value);
     },
     getGeometry,
     hitTest,
@@ -321,6 +347,83 @@ export function createScrollbarOverlay(options = {}) {
     },
     get active() {
       return active;
+    },
+    get opacity() {
+      return opacity;
+    },
+  };
+}
+
+/**
+ * 自动隐藏时间状态机（纯时间函数，不依赖 DOM）。
+ *
+ * 调用方在滚动 / 拖动时调用 show(now)；悬停或拖动滚动条时调用
+ * setPinned(true)，离开时调用 setPinned(false, now)。随后按 delay 安排
+ * 定时器，并在淡出阶段用 opacity(now) 逐帧重绘。所有时间参数都可注入，
+ * 因此可以在 Node 中确定性地测试。
+ *
+ * @param {{ delay?: number, fadeDuration?: number }} options
+ * @returns {{
+ *   show: (now?: number) => void,
+ *   setPinned: (pinned: boolean, now?: number) => void,
+ *   opacity: (now?: number) => number,
+ *   isActive: (now?: number) => boolean,
+ *   delay: number,
+ *   fadeDuration: number,
+ *   pinned: boolean
+ * }}
+ */
+export function createScrollbarAutoHide(options = {}) {
+  const delay = numberOption(
+    options.delay,
+    DEFAULT_SCROLLBAR_AUTO_HIDE.delay,
+    'delay',
+    { allowZero: true },
+  );
+  const fadeDuration = numberOption(
+    options.fadeDuration,
+    DEFAULT_SCROLLBAR_AUTO_HIDE.fadeDuration,
+    'fadeDuration',
+    { allowZero: true },
+  );
+
+  let lastActive = null;
+  let pinned = false;
+
+  return {
+    show(now = nowMs()) {
+      lastActive = now;
+    },
+    setPinned(value, now = nowMs()) {
+      const next = Boolean(value);
+      if (next === pinned) return;
+      pinned = next;
+      if (!pinned) lastActive = now;
+    },
+    opacity(now = nowMs()) {
+      if (pinned) return 1;
+      if (lastActive === null || !Number.isFinite(now)) return 0;
+      const elapsed = now - lastActive;
+      if (elapsed <= delay) return 1;
+      if (fadeDuration <= 0 || elapsed >= delay + fadeDuration) return 0;
+      return 1 - (elapsed - delay) / fadeDuration;
+    },
+    isActive(now = nowMs()) {
+      return (
+        pinned ||
+        (lastActive !== null &&
+          Number.isFinite(now) &&
+          now < lastActive + delay + fadeDuration)
+      );
+    },
+    get delay() {
+      return delay;
+    },
+    get fadeDuration() {
+      return fadeDuration;
+    },
+    get pinned() {
+      return pinned;
     },
   };
 }
@@ -405,6 +508,17 @@ function containsPoint(rect, x, y) {
 
 function normalizeAxis(axis) {
   return axis === 'x' || axis === 'y' ? axis : null;
+}
+
+function clampOpacity(value) {
+  if (value === undefined || value === null) return 1;
+  if (!Number.isFinite(value)) return 0;
+  return clamp(value, 0, 1);
+}
+
+function nowMs() {
+  const perf = globalThis.performance;
+  return perf && typeof perf.now === 'function' ? perf.now() : Date.now();
 }
 
 function assertGeometry(geometry) {
