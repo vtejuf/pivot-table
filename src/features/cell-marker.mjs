@@ -20,7 +20,7 @@
  *       cellStyle: marker.cellStyle,
  *     }, marker.draw);
  *
- * 完整挂载点说明见 docs/custom-features.md。
+ * 完整挂载点说明见 docs/custom-features.zh-CN.md。
  */
 
 const DEFAULTS = Object.freeze({
