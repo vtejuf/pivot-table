@@ -18,19 +18,27 @@ Aggregate JSON detail rows into a pivot table: the aggregation layer keeps one r
 
 ## Quick start
 
-### Node
+### npm
+
+```bash
+npm install @vtejuf/pivot-table
+```
+
+The package is ESM-only. Import the core API from the package root, and optional features from `@vtejuf/pivot-table/features/*`.
+
+### Node (repository)
 
 ```bash
 node examples/demo.mjs
 node --test test/model/*.test.mjs test/render/*.test.mjs \
-  test/features/*.test.mjs test/site/*.test.mjs test/architecture.test.mjs
+  test/features/*.test.mjs test/site/*.test.mjs test/package.test.mjs \
+  test/architecture.test.mjs
 ```
 
 ### Minimal call
 
 ```js
-import { aggregate, layoutPivot } from './src/model/index.mjs';
-import { renderPivot } from './src/render/index.mjs';
+import { aggregate, layoutPivot, renderPivot } from '@vtejuf/pivot-table';
 
 const dimensions = [
   { key: 'region', axis: 'row' },
@@ -51,7 +59,7 @@ renderPivot(canvas, layout, {
 });
 ```
 
-For the full `dimensions` rules, aggregate functions, layout modes, render options, and feature authoring, see [Data flow](https://vtejuf.github.io/pivot-table/index.en.html#pipeline) and [Quickstart](https://vtejuf.github.io/pivot-table/index.en.html#quickstart) on the live site.
+For the full `dimensions` rules, aggregate functions, layout modes, render options, and feature authoring, see [Data flow](https://vtejuf.github.io/pivot-table/index.en.html#pipeline) and [Quickstart](https://vtejuf.github.io/pivot-table/index.en.html#quickstart) on the live site. Feature modules are available at `@vtejuf/pivot-table/features/heatmap`, `.../totals`, and so on.
 
 ### Site and examples
 
@@ -88,6 +96,7 @@ Design docs in the repository (currently in Chinese):
 ## Project layout
 
 ```
+src/index.mjs     Package root entry (model + render)
 src/model/       Aggregation, matrix layout, dimension keys
 src/render/      Geometry, Canvas drawing, theme
 src/features/    Dual measures, heatmap, totals, collapse, scrollbars, ...

@@ -18,19 +18,27 @@
 
 ## 快速开始
 
-### Node
+### npm
+
+```bash
+npm install @vtejuf/pivot-table
+```
+
+包是 ESM-only。核心 API 从包根入口导入，可选 feature 从 `@vtejuf/pivot-table/features/*` 导入。
+
+### Node（仓库内）
 
 ```bash
 node examples/demo.mjs
 node --test test/model/*.test.mjs test/render/*.test.mjs \
-  test/features/*.test.mjs test/site/*.test.mjs test/architecture.test.mjs
+  test/features/*.test.mjs test/site/*.test.mjs test/package.test.mjs \
+  test/architecture.test.mjs
 ```
 
 ### 最小调用
 
 ```js
-import { aggregate, layoutPivot } from './src/model/index.mjs';
-import { renderPivot } from './src/render/index.mjs';
+import { aggregate, layoutPivot, renderPivot } from '@vtejuf/pivot-table';
 
 const dimensions = [
   { key: 'region', axis: 'row' },
@@ -51,7 +59,7 @@ renderPivot(canvas, layout, {
 });
 ```
 
-`dimensions` 的完整规则、聚合函数、布局模式、渲染选项和 feature 写法，见主页的[数据流](https://vtejuf.github.io/pivot-table/#pipeline)与[快速开始](https://vtejuf.github.io/pivot-table/#quickstart)。
+`dimensions` 的完整规则、聚合函数、布局模式、渲染选项和 feature 写法，见主页的[数据流](https://vtejuf.github.io/pivot-table/#pipeline)与[快速开始](https://vtejuf.github.io/pivot-table/#quickstart)。feature 模块通过 `@vtejuf/pivot-table/features/heatmap`、`.../totals` 等子路径导入。
 
 ### 主页与示例
 
@@ -88,6 +96,7 @@ python3 -m http.server 8000
 ## 目录结构
 
 ```
+src/index.mjs     包根入口（model + render）
 src/model/       聚合、矩阵布局、维度键
 src/render/      几何、Canvas 绘制、主题
 src/features/    并列度量、热力图、小计/总计、折叠、滚动条等

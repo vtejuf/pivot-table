@@ -1,0 +1,51 @@
+{
+  "name": "@vtejuf/pivot-table",
+  "version": "0.1.0",
+  "description": "Zero-dependency pivot table model and Canvas renderer.",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vtejuf/pivot-table.git"
+  },
+  "homepage": "https://vtejuf.github.io/pivot-table/",
+  "bugs": {
+    "url": "https://github.com/vtejuf/pivot-table/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./model": "./src/model/index.mjs",
+    "./render": "./src/render/index.mjs",
+    "./features/*": "./src/features/*.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "pivot-table",
+    "pivot",
+    "canvas",
+    "data-grid",
+    "visualization",
+    "esm",
+    "zero-dependencies"
+  ],
+  "scripts": {
+    "test": "node --test test/model/*.test.mjs test/render/*.test.mjs test/features/*.test.mjs test/site/*.test.mjs test/package.test.mjs test/architecture.test.mjs",
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "node --test test/model/*.test.mjs test/render/*.test.mjs test/features/*.test.mjs test/site/*.test.mjs test/package.test.mjs test/architecture.test.mjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
