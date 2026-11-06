@@ -85,13 +85,13 @@ python3 -m http.server 8000
 - [维度深度实验](https://vtejuf.github.io/pivot-table/#depth)
 - [快速开始](https://vtejuf.github.io/pivot-table/#quickstart)
 
-仓库内的设计文档：
+仓库内的设计文档（英文版为默认，中文版使用 `.zh-CN.md` 后缀）：
 
-- [矩阵推导与 cartesian / compact 差异](docs/matrix-transform.md)
-- [Canvas 渲染管线与性能方案](docs/rendering.md)
-- [附加功能架构与边界](docs/features-architecture.md)
-- [自定义 feature 挂载点](docs/custom-features.md)
-- [行/列小计/总计规则](docs/totals.md)
+- [矩阵推导与 cartesian / compact 差异](docs/matrix-transform.zh-CN.md)
+- [Canvas 渲染管线与性能方案](docs/rendering.zh-CN.md)
+- [附加功能架构与边界](docs/features-architecture.zh-CN.md)
+- [自定义 feature 挂载点](docs/custom-features.zh-CN.md)
+- [行/列小计/总计规则](docs/totals.zh-CN.md)
 
 ## 目录结构
 

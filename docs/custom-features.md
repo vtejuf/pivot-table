@@ -1,9 +1,13 @@
-# 自定义 feature 指南
+[English](custom-features.md) · [简体中文](custom-features.zh-CN.md)
 
-- **状态**：已实现 `cell-marker` 示例；本文覆盖当前所有扩展挂载点。
-- **原则**：核心算法冻结；feature 只读取核心输出，核心不反向依赖 feature。
+# Custom feature guide
 
-依赖方向：
+- **Status**: The `cell-marker` example is implemented; this guide covers every current
+  extension mount point.
+- **Principle**: Core algorithms are frozen; features only read core output, and the core
+  never depends on features.
+
+Dependency direction:
 
 ```
 site / examples / bench
@@ -13,24 +17,30 @@ site / examples / bench
     model / render
 ```
 
-## 0. 先选挂载点
+## 0. Choose a mount point first
 
-先判断你要改变什么，再决定挂在哪里：
+Decide what you want to change, then choose where to attach:
 
-- 想改变进入布局的数据：**数据派生**（aggregate 之后）。
-- 想改变网格、表头或单元格结构：**布局派生**（layoutPivot 之后）。
-- 想改单元格颜色、文本或主题：**渲染配置**（`cellStyle` / `formatValue` / `theme`）。
-- 想在核心绘制后加装饰：**渲染后叠加**（`renderWithOverlay`）。
-- 想处理点击、滚动、下钻：**交互层**，写回 `scrollX / scrollY` 或重新聚合。
+- Change the data entering layout: **data derivation** (after aggregate).
+- Change the grid, headers, or cell structure: **layout derivation** (after
+  layoutPivot).
+- Change cell colors, text, or theme: **render configuration** (`cellStyle` /
+  `formatValue` / `theme`).
+- Add decorations after core drawing: **post-render overlay** (`renderWithOverlay`).
+- Handle clicks, scrolling, or drill-down: **interaction layer**, writing back
+  `scrollX / scrollY` or re-aggregating.
 
-不要为了一个 feature 修改 `src/model` 或 `src/render`。如果现有挂载点确实不够，先提出向后兼容的扩展方案，再改核心。
+Never modify `src/model` or `src/render` for a single feature. If the existing mount
+points are genuinely insufficient, propose a backward-compatible extension before
+changing the core.
 
 <a id="data"></a>
-## 1. 数据派生（aggregate 之后）
+## 1. Data derivation (after aggregate)
 
-输入是 `cube`（`aggregate()` 的返回值），输出仍然是能交给 `layoutPivot()` 的行和维度配置。
+Input is a `cube` (the return value of `aggregate()`); output is still rows and
+dimension configuration that can be passed to `layoutPivot()`.
 
-### 并列度量
+### Dual measures
 
 ```js
 import { combineMeasures } from './src/features/dual-measure.mjs';
@@ -39,8 +49,8 @@ import { layoutPivot } from './src/model/index.mjs';
 const dual = combineMeasures({
   dimensions,
   measures: [
-    { label: '销售额', rows: salesCube.rows, valueField: salesCube.measure.key },
-    { label: '订单数', rows: countCube.rows, valueField: countCube.measure.key },
+    { label: 'Sales', rows: salesCube.rows, valueField: salesCube.measure.key },
+    { label: 'Orders', rows: countCube.rows, valueField: countCube.measure.key },
   ],
 });
 
@@ -50,9 +60,10 @@ const layout = layoutPivot(dual.rows, {
 });
 ```
 
-`combineMeasures()` 把多个 aggregate 结果展开成长表，并把 `measure` 作为列轴最末层维度。它不修改输入 cube。
+`combineMeasures()` expands multiple aggregate results into a long table and makes
+`measure` the last column-axis dimension. It does not modify the input cubes.
 
-### 汇总上卷
+### Total rollup
 
 ```js
 import { rollupTotals } from './src/features/totals.mjs';
@@ -63,27 +74,30 @@ const rolled = rollupTotals(cube, {
 });
 ```
 
-`rollupTotals()` 只读 `cube`，输出独立的汇总表，不生成布局行。下一步交给 `withTotals()`。
+`rollupTotals()` only reads `cube` and outputs an independent rollup table; it generates
+no layout rows. The next step hands it to `withTotals()`.
 
-### 自己写数据派生
+### Writing your own data derivation
 
-- 输入：`cube.rows`、`cube.dimensions`、`cube.measure`；
-- 输出：新的 `rows` / `dimensions` / `value` 字段名；
-- 不要原地修改 `cube.rows` 或 `cube.dimensions`；
-- 同一维度组合必须唯一，否则 `layoutPivot()` 会报错。
+- Input: `cube.rows`, `cube.dimensions`, `cube.measure`;
+- Output: new `rows` / `dimensions` / `value` field name;
+- Do not mutate `cube.rows` or `cube.dimensions` in place;
+- Each dimension combination must be unique, or `layoutPivot()` will throw.
 
-参考：`src/features/dual-measure.mjs`、`src/features/totals.mjs`、[totals.md](totals.md)。
+Reference: `src/features/dual-measure.mjs`, `src/features/totals.mjs`,
+[totals.md](totals.md).
 
 <a id="layout"></a>
-## 2. 布局派生（layoutPivot 之后）
+## 2. Layout derivation (after layoutPivot)
 
-输入是核心 `layout`，输出是一个**新的展示布局**，结构需要满足渲染器契约：
+Input is the core `layout`; output is a **new display layout** whose structure satisfies
+the renderer contract:
 
 - `size: { rows, cols }`
 - `axes.row.header` / `axes.col.header`
 - `cells: [{ x, y, value, members, ... }]`
 - `cellMap: Map<"x,y", cell>`
-- `matrix` 可以是 `null`，渲染器不依赖它。
+- `matrix` may be `null`; the renderer does not depend on it.
 
 ```js
 import { rollupTotals, withTotals } from './src/features/totals.mjs';
@@ -97,25 +111,27 @@ const display = withTotals(base, rolled);
 renderPivot(canvas, display, { viewport });
 ```
 
-注意：
+Notes:
 
-- 不要原地修改 `base.cells`、`base.axes`、`base.cellMap`；
-- 插入行/列后要重建 `size`、表头、`cellMap`；
-- 汇总格可以带 `cell.kind = 'subtotal' | 'total'`，供 `cellStyle` 区分；
-- 布局派生后的对象仍然交给同一个 `renderPivot()`。
+- Do not mutate `base.cells`, `base.axes`, or `base.cellMap` in place;
+- After inserting rows/columns, rebuild `size`, headers, and `cellMap`;
+- Rolled-up cells can carry `cell.kind = 'subtotal' | 'total'` for `cellStyle` to
+  distinguish;
+- The derived layout object is still passed to the same `renderPivot()`.
 
-参考：`src/features/totals.mjs`、[totals.md](totals.md)。
+Reference: `src/features/totals.mjs`, [totals.md](totals.md).
 
 <a id="collapse"></a>
-## 2.1 展开 / 折叠
+## 2.1 Expand / collapse
 
-折叠先在数据层重新上卷，再交给核心 `layoutPivot()`；它不是原地修改 layout：
+Collapse re-rolls up at the data layer first, then hands the result to core
+`layoutPivot()`; it does not mutate the layout in place:
 
 ```js
 import { layoutPivot } from './src/model/index.mjs';
 import { collapseCube, collapseKey } from './src/features/collapse.mjs';
 
-const collapsed = new Set([collapseKey('row', 'region', '华东')]);
+const collapsed = new Set([collapseKey('row', 'region', 'east')]);
 const next = collapseCube(cube, collapsed);
 const layout = layoutPivot(next.rows, {
   dimensions: next.dimensions,
@@ -124,13 +140,18 @@ const layout = layoutPivot(next.rows, {
 });
 ```
 
-- 当前只支持 compact；可与行/列汇总、并列度量同时使用；cartesian 暂不叠加；
-- 被折叠父成员的子维度显示为 `（全部）`，表示该父级的汇总；
-- 父表头命中用 `hitTestHeader()`，指示器用 `drawCollapseIndicators()`；
-- 折叠键用 `collapseKey(axis, dimension, value)` 生成，存进 Set 即可切换。
+- Currently compact mode only; it can be combined with row/column totals and dual
+  measures; cartesian mode is not stacked yet;
+- Collapsed parent members show `（全部）` as their child dimension value, representing
+  that parent's rollup;
+- Parent header hits use `hitTestHeader()`, and indicators use
+  `drawCollapseIndicators()`;
+- Collapse keys are generated by `collapseKey(axis, dimension, value)` and stored in a
+  Set for toggling.
 
-多度量时，**分别折叠每个 measure 的 cube，再合并**；不要直接折叠
-`combineMeasures()` 的长表，否则 measure 维度会被一起替换：
+With multiple measures, **collapse each measure's cube separately, then combine**; do
+not collapse the long table from `combineMeasures()` directly, or the measure dimension
+will be replaced along with it:
 
 ```js
 import { layoutPivot } from './src/model/index.mjs';
@@ -142,8 +163,8 @@ const count = collapseCube(countCube, collapsed);
 const dual = combineMeasures({
   dimensions: salesCube.dimensions,
   measures: [
-    { label: '销售额', rows: sales.rows, valueField: sales.measure.key },
-    { label: '订单数', rows: count.rows, valueField: count.measure.key },
+    { label: 'Sales', rows: sales.rows, valueField: sales.measure.key },
+    { label: 'Orders', rows: count.rows, valueField: count.measure.key },
   ],
 });
 const layout = layoutPivot(dual.rows, {
@@ -153,19 +174,22 @@ const layout = layoutPivot(dual.rows, {
 });
 ```
 
-汇总时用折叠后的 cube 上卷，并给 `withTotals()` 传 `shouldIncludeSubtotal`，
-跳过折叠父级的小计；总计保留，交叉格才能完整。
+For totals, roll up from the collapsed cubes and pass `shouldIncludeSubtotal` to
+`withTotals()` to skip subtotals for collapsed parents; grand totals are preserved so
+intersection cells stay complete.
 
-多度量布局中，`measure` 维度及其**直接父维度**不具备折叠语义：父维度折叠会
-把 measure 一起替换。用 `hitTestHeader()` / `drawCollapseIndicators()` 的
-`canCollapse` 过滤这两个维度，不显示按钮也不响应点击。
+In multi-measure layouts, the `measure` dimension and its **direct parent dimension**
+have no collapse semantics: collapsing the parent would replace the measure as well.
+Filter those two dimensions with `canCollapse` in `hitTestHeader()` /
+`drawCollapseIndicators()` so no button is shown and no click is handled.
 
-参考：`src/features/collapse.mjs`、`test/features/collapse.test.mjs`。
+Reference: `src/features/collapse.mjs`, `test/features/collapse.test.mjs`.
 
 <a id="render-config"></a>
-## 3. 渲染配置：cellStyle / formatValue / theme
+## 3. Render configuration: cellStyle / formatValue / theme
 
-这些选项直接传给 `renderPivot()` 或 `renderWithOverlay()`，不需要派生布局。
+These options are passed directly to `renderPivot()` or `renderWithOverlay()`; no layout
+derivation is needed.
 
 ### cellStyle
 
@@ -181,36 +205,42 @@ renderPivot(canvas, layout, {
 });
 ```
 
-- `cell` 可能是 `null`（空格子），先判空；
-- 返回值只包含 `background` / `text`，其余样式由核心主题决定；
-- 逐可见格调用，保持轻量，不要在里面做重计算；
-- 需要跨格计算（如色阶 min/max）时，先创建一次样式函数，再在回调里查表。
+- `cell` may be `null` (an empty cell), so check for null first;
+- The return value contains only `background` / `text`; all other styling comes from the
+  core theme;
+- Called once per visible cell; keep it lightweight and avoid heavy computation;
+- For cross-cell calculations (such as color-scale min/max), create the style function
+  once, then look up a precomputed table inside the callback.
 
-示例：`src/features/heatmap.mjs`、`src/features/cell-marker.mjs`。
+Examples: `src/features/heatmap.mjs`, `src/features/cell-marker.mjs`.
 
 ### formatValue
 
 ```js
 renderPivot(canvas, layout, {
   formatValue: (value, cell) =>
-    typeof value === 'number' ? value.toLocaleString('zh-CN') : String(value),
+    typeof value === 'number' ? value.toLocaleString('en-US') : String(value),
 });
 ```
 
-返回 `null` / `undefined` / 空字符串时跳过文本绘制。适合单位、百分比、货币等纯文本格式化。
+Returning `null` / `undefined` / an empty string skips text drawing. Suitable for pure
+text formatting such as units, percentages, and currency.
 
-### theme / 尺寸 / overscan
+### theme / sizing / overscan
 
-- `theme`：覆盖默认颜色和字体；
-- `cellSize` / `headerSize`：格子与表头尺寸；
-- `overscan`：可见范围向两侧多取格子，适合预渲染或自定义绘制。
+- `theme`: overrides default colors and fonts;
+- `cellSize` / `headerSize`: cell and header sizes;
+- `overscan`: extends the visible range on both sides, useful for pre-rendering or
+  custom drawing.
 
-核心渲染器只保留这些通用接缝，不包含热力图等业务逻辑。
+The core renderer keeps only these general seams and contains no business logic such as
+heatmaps.
 
 <a id="overlay"></a>
-## 4. 渲染后叠加：renderWithOverlay
+## 4. Post-render overlay: renderWithOverlay
 
-`renderWithOverlay(target, layout, options, draw)` 先调用核心 `renderPivot()`，再把同一个 2D context 交给 `draw`：
+`renderWithOverlay(target, layout, options, draw)` calls core `renderPivot()` first,
+then hands the same 2D context to `draw`:
 
 ```js
 import { renderWithOverlay } from './src/features/overlay.mjs';
@@ -226,22 +256,24 @@ renderWithOverlay(canvas, layout, { viewport }, (ctx, { geometry, theme }) => {
 });
 ```
 
-约定：
+Conventions:
 
-- 坐标是 CSS 像素，DPR 变换已由核心设置；
-- `draw(ctx, { layout, geometry, theme, options })` 可以读取布局和几何；
-- 自己 `save()` / `restore()`，不要污染下一次绘制；
-- 画数据格装饰时，用 `geometry.dataClip` 裁剪，避免画到冻结表头；
-- `draw` 抛错时 `renderWithOverlay` 会恢复 context。
+- Coordinates are CSS pixels; the DPR transform is already set by the core;
+- `draw(ctx, { layout, geometry, theme, options })` can read layout and geometry;
+- Call `save()` / `restore()` yourself and do not pollute the next draw;
+- When decorating data cells, clip with `geometry.dataClip` to avoid drawing over frozen
+  headers;
+- If `draw` throws, `renderWithOverlay` restores the context.
 
-内置示例：`src/features/overlay.mjs`（角区标签）、`src/features/scrollbar.mjs`（滚动条）。
+Built-in examples: `src/features/overlay.mjs` (corner labels),
+`src/features/scrollbar.mjs` (scrollbars).
 
 <a id="interaction"></a>
-## 5. 交互与命中测试
+## 5. Interaction and hit testing
 
-核心不绑定事件；交互属于 site / feature 层。
+The core binds no events; interaction belongs to the site / feature layer.
 
-### 单元格命中
+### Cell hits
 
 ```js
 const x = Math.floor(
@@ -253,22 +285,25 @@ const y = Math.floor(
 const cell = layout.cellMap.get(`${x},${y}`);
 ```
 
-### 滚动与拖拽
+### Scrolling and dragging
 
-- 滚轮、拖拽、键盘最终都写回 `scrollX / scrollY`；
-- 下一次 `computePivotGeometry()` / `renderPivot()` 只重绘可见部分；
-- 滚动条 feature 额外提供 `hitTest()` 和 `scrollFromThumbPosition()`。
+- Wheel, drag, and keyboard all ultimately write back to `scrollX / scrollY`;
+- The next `computePivotGeometry()` / `renderPivot()` redraws only visible parts;
+- The scrollbar feature additionally provides `hitTest()` and
+  `scrollFromThumbPosition()`.
 
-### 下钻
+### Drill-down
 
-用 `cell.members` 过滤明细，重新 `aggregate()` + `layoutPivot()`，再渲染。不要直接修改当前 `layout`。
+Filter detail rows with `cell.members`, re-run `aggregate()` + `layoutPivot()`, then
+render. Do not mutate the current `layout` directly.
 
-完整交互示例：`site/demo.mjs`、`examples/canvas.html`。
+Complete interaction examples: `site/demo.mjs`, `examples/canvas.html`.
 
 <a id="cell-marker"></a>
-## 6. 完整示例：cell-marker
+## 6. Complete example: cell-marker
 
-`src/features/cell-marker.mjs` 是一个最小自定义 feature：按谓词标记高值格子。
+`src/features/cell-marker.mjs` is a minimal custom feature: it marks high-value cells by
+predicate.
 
 ```js
 import { renderWithOverlay } from './src/features/overlay.mjs';
@@ -284,48 +319,53 @@ renderWithOverlay(canvas, layout, {
 }, marker.draw);
 ```
 
-它同时挂两个点：
+It mounts at two points at once:
 
-- `cellStyle`：命中谓词的格子使用自定义背景和文字色；
-- `draw`：在命中格子右上角画一个小标记，只遍历 `geometry.visible`，并用 `dataClip` 裁剪。
+- `cellStyle`: cells matching the predicate use custom background and text colors;
+- `draw`: draws a small marker at the top-right of matching cells, iterating only over
+  `geometry.visible` and clipping with `dataClip`.
 
-实现约束：
+Implementation constraints:
 
-- 只读 `layout.cells` / `layout.cellMap` / `geometry`；
-- 不修改核心对象；
-- 不新增核心 API；
-- `draw` 返回实际标记数量，便于测试和统计。
+- Read only `layout.cells` / `layout.cellMap` / `geometry`;
+- Do not modify core objects;
+- Do not add core APIs;
+- `draw` returns the actual marker count, useful for tests and statistics.
 
-测试：`test/features/cell-marker.test.mjs`。Demo 中的“高值标记”开关使用当前布局的 80 分位作为阈值。
+Tests: `test/features/cell-marker.test.mjs`. The "High-value markers" switch in the Demo
+uses the 80th percentile of the current layout as its threshold.
 
 <a id="architecture"></a>
-## 7. 依赖规则与测试
+## 7. Dependency rules and testing
 
-- `features` 可以 import `model` / `render`；
-- `src/model` 和 `src/render` **禁止** import `features`；
-- `site` 只做 UI 绑定和 feature 编排；
-- 不原地修改核心的 `cells`、`axes`、`cellMap`；
-- 不为了某个 feature 修改核心默认输出。
+- `features` may import `model` / `render`;
+- `src/model` and `src/render` **must not** import `features`;
+- `site` only handles UI binding and feature orchestration;
+- Do not mutate core `cells`, `axes`, or `cellMap` in place;
+- Do not change core default output for a feature.
 
-架构守卫测试会扫描 `src/model` / `src/render` 的 import，发现反向依赖即失败。
+Architecture guard tests scan imports in `src/model` / `src/render` and fail on reverse
+dependencies.
 
-测试建议：
+Testing recommendations:
 
-- feature 独立测试放在 `test/features/`；
-- 渲染类逻辑用记录调用的 fake 2D context；
-- 覆盖空布局、无命中、可见范围裁剪和参数校验；
-- 运行全量测试：
+- Independent feature tests go under `test/features/`;
+- Use a call-recording fake 2D context for rendering logic;
+- Cover empty layouts, no matches, visible-range clipping, and argument validation;
+- Run the full test suite:
 
 ```bash
 node --test test/model/*.test.mjs test/render/*.test.mjs \
   test/features/*.test.mjs test/site/*.test.mjs test/architecture.test.mjs
 ```
 
-## 8. 检查清单
+## 8. Checklist
 
-- [ ] feature 只读核心输出，没有原地修改 `layout` / `cube`。
-- [ ] 通过 `cellStyle`、`formatValue`、`theme`、`renderWithOverlay` 或布局派生接入。
-- [ ] 没有在 `src/model` / `src/render` 里 import feature。
-- [ ] 有独立的 feature 测试，覆盖空数据与裁剪。
-- [ ] 大表上的绘制成本仍然和可见格数相关，或有明确说明。
-- [ ] 更新 README、相关 docs 和示例入口。
+- [ ] The feature reads only core output and never mutates `layout` / `cube` in place.
+- [ ] Integration goes through `cellStyle`, `formatValue`, `theme`,
+      `renderWithOverlay`, or layout derivation.
+- [ ] No feature imports exist in `src/model` / `src/render`.
+- [ ] Independent feature tests exist and cover empty data and clipping.
+- [ ] Drawing cost on large tables still scales with visible cells, or this is
+      documented explicitly.
+- [ ] README, related docs, and example entry points are updated.

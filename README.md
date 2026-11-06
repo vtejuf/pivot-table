@@ -85,7 +85,7 @@ The live site covers, in order:
 - [Depth sweep](https://vtejuf.github.io/pivot-table/index.en.html#depth)
 - [Quickstart](https://vtejuf.github.io/pivot-table/index.en.html#quickstart)
 
-Design docs in the repository (currently in Chinese):
+Design docs in the repository (English by default; the Chinese versions use the `.zh-CN.md` suffix):
 
 - [Matrix derivation and cartesian / compact](docs/matrix-transform.md)
 - [Canvas rendering pipeline and performance](docs/rendering.md)

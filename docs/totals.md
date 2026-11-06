@@ -1,56 +1,66 @@
-# 行 / 列小计与总计（设计稿）
+[English](totals.md) · [简体中文](totals.zh-CN.md)
 
-- **状态**：行/列小计、行/列总计、双轴交叉和多度量分列已实现；折叠联动（单/多度量）已实现（折叠父级跳过小计、总计保留），真正的跨层单格合并、表头样式后续。
-- **日期**：2026-11-02
-- **原则**：核心 `aggregate` / `layoutPivot` / `renderPivot` 冻结；采用路线 B
-  （展示布局派生）；聚合运算和布局插入分离。
+# Row/column subtotals and grand totals (design note)
 
-## 1. 数据流
+- **Status**: Row/column subtotals, row/column grand totals, two-axis intersections,
+  and multi-measure splitting are implemented. Collapse integration (single and
+  multiple measures) is implemented as well: collapsed parents skip subtotals while
+  grand totals are preserved. True cross-level single-cell merging and header styling
+  remain future work.
+- **Date**: 2026-11-02
+- **Principle**: The core `aggregate` / `layoutPivot` / `renderPivot` are frozen; this
+  follows route B (display-layout derivation), separating aggregation from layout
+  insertion.
+
+## 1. Data flow
 
 ```
-明细 rows
-  └─ aggregate()                 核心：最细粒度 cube
-      ├─ rollupTotals()          feature：单度量上卷
-      │   （或 rollupMultiTotals() 多度量按 measure 分列）
-      └─ layoutPivot()           核心：基础布局
-          └─ withTotals()         feature：插入行/列汇总并填充交叉格
+detail rows
+  └─ aggregate()                 core: finest-grained cube
+      ├─ rollupTotals()          feature: single-measure rollup
+      │   (or rollupMultiTotals() for multi-measure columns)
+      └─ layoutPivot()           core: base layout
+          └─ withTotals()        feature: insert row/column totals and fill intersections
               └─ renderPivot()
 ```
 
-`rollupTotals()` 只读 cube，不读 layout；`rollupMultiTotals()` 对每个度量
-分别调用 `rollupTotals()`，再把度量 label 追加到列路径；`withTotals()` 只读
-layout 和上卷结果，不再做任何聚合。行轴兼容入口 `rollupRowTotals()` /
-`withRowTotals()` 仍保留，内部只处理行轴。
+`rollupTotals()` reads only the cube, never the layout; `rollupMultiTotals()` calls
+`rollupTotals()` per measure and then appends the measure label to the column path;
+`withTotals()` reads only the layout and the rollup result, and performs no further
+aggregation. The row-axis compatibility entry points `rollupRowTotals()` /
+`withRowTotals()` are still available and handle only the row axis internally.
 
-## 2. 配置
+## 2. Configuration
 
 ```js
 const config = {
   rows: {
-    subtotals: ['region'], // 只对 region 生成行小计；叶子维度自动忽略
-    grandTotal: true,      // 行末尾一行“总计”
+    subtotals: ['region'], // row subtotals only for region; leaf dimensions are ignored
+    grandTotal: true,      // one "Grand total" row at the end
   },
   cols: {
-    subtotals: ['year'],   // 只对 year 生成列小计；叶子维度自动忽略
-    grandTotal: true,      // 列末尾一列“总计”
+    subtotals: ['year'],   // column subtotals only for year; leaf dimensions are ignored
+    grandTotal: true,      // one "Grand total" column at the end
   },
 };
 ```
 
-- `subtotals` 里的 key 必须属于对应轴的层级链，否则报错。
-- 叶子维度静默忽略，不生成重复的“自身小计”。
-- 首期行/列小计与总计位置固定为末尾。
-- Demo 的四个开关只是把 DOM 状态翻译成上面的配置；feature 不读取 DOM。
-- 全部关闭时 `rollupTotals()` 直接返回 `skipped: true`，不遍历 cube；
-  `withTotals()` 原样返回输入 layout。
+- Every key in `subtotals` must belong to the corresponding axis's hierarchy chain,
+  otherwise an error is thrown.
+- Leaf dimensions are ignored silently, so no duplicate "self subtotal" is generated.
+- Row/column subtotals and grand totals are fixed at the end in this first version.
+- The four Demo switches only translate DOM state into the configuration above; the
+  feature never reads the DOM.
+- When everything is disabled, `rollupTotals()` returns `skipped: true` immediately
+  without scanning the cube, and `withTotals()` returns the input layout unchanged.
 
-多度量入口：
+Multi-measure entry point:
 
 ```js
 const rolled = rollupMultiTotals(
   [
-    { label: '销售额', cube: salesCube },
-    { label: '订单数', cube: countCube },
+    { label: 'Sales', cube: salesCube },
+    { label: 'Orders', cube: countCube },
   ],
   {
     rows: { subtotals: ['region'], grandTotal: true },
@@ -61,19 +71,23 @@ const rolled = rollupMultiTotals(
 );
 ```
 
-列小计/总计按 measure 分列，标签例如 `2023 小计 · 销售额`、
-`总计 · 订单数`；不同度量不会相加。行汇总行覆盖所有度量列。
+Column subtotals/totals are split by measure. Default labels are Chinese
+(`'{value} 小计'` and `'总计'`); pass `labels` to
+`withTotals(layout, rolled, { labels: { subtotal: '{value} subtotal', total: 'Grand total' } })`
+to localize them. Different measures are never added together. A row total row covers
+all measure columns.
 
-## 3. 上卷
+## 3. Rollup
 
-每个维度值序列生成三类路径：
+Each dimension-value sequence generates three kinds of paths:
 
-- `base`：完整行/列组合；
-- `subtotal`：行/列链根到配置维度的前缀；
-- `total`：空路径。
+- `base`: the full row/column combination;
+- `subtotal`: the prefix from the row/column chain root to the configured dimension;
+- `total`: the empty path.
 
-每条明细同时累加到它所属的每个行路径 × 列路径组合；`base × base` 已经由
-基础布局的 `cells` 提供，不进入汇总表。输出：
+Each detail row is accumulated into every row path × column path combination it
+belongs to; `base × base` is already provided by the base layout's `cells` and does not
+enter the rollup table. Output:
 
 ```js
 {
@@ -88,103 +102,127 @@ const rolled = rollupMultiTotals(
 }
 ```
 
-键使用维度值的稳定编码：
+Keys use a stable encoding of dimension values:
 
 ```js
 pathKey(values) === JSON.stringify(values.map(valueKey))
 ```
 
-`valueKey` 与核心聚合/布局共用，避免 `'1'` 与 `1`、`null` 等取值混淆。
+`valueKey` is shared with core aggregation/layout, avoiding collisions such as `'1'`
+versus `1` or `null`.
 
-内置 reducer 与核心 `aggregate` 语义一致：
+Built-in reducers match core `aggregate` semantics:
 
-- `sum`：有限数值相加；无有效值返回 0。
-- `count`：计数相加。
-- `avg`：`sum(value × __valueCount) / sum(__valueCount)`，不能简单平均平均值。
-- `min` / `max`：跳过 null / 非数值后合并；无有效值返回 null。
+- `sum`: adds finite numbers; returns 0 when no valid values exist.
+- `count`: adds counts.
+- `avg`: `sum(value × __valueCount) / sum(__valueCount)`; averaging the averages is not
+  correct.
+- `min` / `max`: skip null / non-numeric values and then merge; return null when no
+  valid values exist.
 
-自定义 reducer 是纯函数：
+A custom reducer is a pure function:
 
 ```js
 const reduce = (records, context) => ({
   value,
-  __count,      // 可选，缺省按子记录求和
-  __valueCount, // 可选，缺省按子记录求和
+  __count,      // optional; defaults to the sum over child records
+  __valueCount, // optional; defaults to the sum over child records
 });
 ```
 
-`context` 包含：
+`context` contains:
 
 ```js
 {
   measure: { key, aggregate },
-  dimension: 'region' | null,     // 行小计维度；空路径/总计为 null
-  colDimension: 'year' | null,    // 列小计维度
-  path: [{ key, value }],         // 行分组路径
-  columns: [{ key, value }],      // 列分组路径
+  dimension: 'region' | null,     // row subtotal dimension; null for the empty path/total
+  colDimension: 'year' | null,    // column subtotal dimension
+  path: [{ key, value }],         // row grouping path
+  columns: [{ key, value }],      // column grouping path
   rowKind: 'base' | 'subtotal' | 'total',
   colKind: 'base' | 'subtotal' | 'total',
 }
 ```
 
-`records` 是最细粒度的聚合记录，不是原始明细。中位数、去重计数这类不能只靠
-聚合值上卷的规则，不在当前范围；需要明细的规则应在聚合阶段解决。
+`records` are the finest-grained aggregated records, not raw detail rows. Rules that
+cannot be rolled up from aggregated values alone, such as median or distinct count, are
+out of scope; they belong in the aggregation stage.
 
-多度量时，`rollupMultiTotals()` 对每个度量使用各自的 cube 上卷，因此 `avg`
-仍能使用该度量的 `__valueCount`；不要用 `combineMeasures` 的长表做上卷，
-那条路径会丢失 `__count` / `__valueCount`。
+For multiple measures, `rollupMultiTotals()` rolls up each measure from its own cube,
+so `avg` still has access to that measure's `__valueCount`. Do not roll up the long
+table produced by `combineMeasures`, since that path loses `__count` /
+`__valueCount`.
 
-## 4. 布局派生
+## 4. Layout derivation
 
-- 行/列都使用父块内小计：父 member 的 `size` 增加汇总行/列，父标签覆盖它；
-  子层显示“小计”。
-- 总计在根层；更深层用空占位 children 链填满，避免露出画布背景。
-- 原始 cells 的 `x / y` 按插入数量平移；汇总 cells 使用槽位的新坐标。
-- 多度量时，列小计的每个 measure 变体是一个独立槽位，父列块 `size` 增加
-  measure 数量；列总计同理。
-- 汇总格分三类：
-  - 基础行 × 列小计/总计；
-  - 行小计/总计 × 基础列；
-  - 行小计/总计 × 列小计/总计（交叉格）。
-- 汇总格带 `cell.kind = 'subtotal' | 'total'`、`rowKind / colKind`、
-  `rowGroup / colGroup` 和实际匹配的 `members`；不伪造被折叠子维度的值。
-- 行/列 `matrix` 置 `null`；`points` 置空；`toPixel()` 按新 cells 重新实现。
-- 输入 layout 不被修改。
+- Rows and columns use in-parent-block subtotals: the parent member's `size` grows by
+  the subtotal rows/columns, and the parent label covers them; child levels show
+  the subtotal label (Chinese `小计` by default).
+- Grand totals live at the root level; deeper levels are filled with empty placeholder
+  child chains so the canvas background never shows through.
+- Original cells' `x / y` shift by the number of insertions; rolled-up cells use the
+  new slot coordinates.
+- With multiple measures, each measure variant of a column subtotal is an independent
+  slot, and the parent column block's `size` grows by the number of measures; the same
+  applies to column grand totals.
+- Rolled-up cells fall into three categories:
+  - base row × column subtotal/total;
+  - row subtotal/total × base column;
+  - row subtotal/total × column subtotal/total (intersection cells).
+- Rolled-up cells carry `cell.kind = 'subtotal' | 'total'`, `rowKind / colKind`,
+  `rowGroup / colGroup`, and the actually matched `members`; collapsed child dimension
+  values are never fabricated.
+- The row/column `matrix` is set to `null`; `points` is emptied; `toPixel()` is
+  reimplemented against the new cells.
+- The input layout is never mutated.
 
-表头不变量：每个轴同一层 members 的 `size` 之和等于父 member 的 `size`，
-根层之和等于该轴 `size.rows / size.cols`；汇总行/列在每一层都有表头单元格。
-父级标签覆盖汇总行/列属于 rowspan/colspan 式覆盖，不是真正的单格跨层合并；
-需要单个标签横跨多个表头层时，仍需核心 `depthSpan` 或 overlay 扩展。
+Header invariants: within one axis and level, the sum of member `size` values equals the
+parent member's `size`, and the root sum equals that axis's `size.rows / size.cols`;
+subtotal/grand-total rows and columns have header cells at every level. A parent label
+covering subtotal rows/columns is a rowspan/colspan-style cover, not a true cross-level
+single-cell merge; a single label spanning multiple header levels still requires core
+`depthSpan` or an overlay extension.
 
-## 5. 边界
+## 5. Boundaries
 
-- 空数据：不插入任何汇总，`withTotals()` 原样返回。
-- 只有行轴或只有列轴：另一轴退化为单行/单列；纯列透视也能插入列汇总。
-- 列轴为空 / 行轴为空：对应轴的总计跳过，不报错。
-- 对叶子维度配置小计：静默忽略。
-- `compact` / `cartesian` 都支持；展示布局不再依赖固定矩阵。
-- 多度量通过 `rollupMultiTotals()` 处理；列汇总按 measure 分列，不混加。
-  使用原始分度量 cube，不要使用 `combineMeasures` 的长表做上卷。
-- 折叠联动：`withTotals()` 的 `shouldIncludeSubtotal` 可让折叠父级跳过小计，
-  总计保留；上卷使用折叠后的 cube，保证折叠占位行/列的交叉格有值。
-  多度量时每个 measure 的 cube 分别折叠并上卷，再合并。
-  真正的单格跨层合并、表头样式仍未实现；折叠实现见
-  [custom-features.md](custom-features.md#collapse)。
+- Empty data: no totals are inserted; `withTotals()` returns the input unchanged.
+- Only a row axis or only a column axis: the other axis degenerates to a single
+  row/column; a pure column pivot can still receive column totals.
+- Empty column axis / empty row axis: the corresponding axis's grand total is skipped
+  without error.
+- Subtotals configured on a leaf dimension are ignored silently.
+- Both `compact` and `cartesian` are supported; the display layout no longer depends on
+  a fixed matrix.
+- Multiple measures go through `rollupMultiTotals()`; column totals are split by
+  measure and never mixed. Use the original per-measure cubes, not the long table from
+  `combineMeasures`, for rolling up.
+- Collapse integration: `withTotals()`'s `shouldIncludeSubtotal` lets collapsed parents
+  skip subtotals while keeping grand totals; rollup uses the collapsed cube so
+  intersection cells between collapsed placeholder rows/columns have values.
+  With multiple measures, each measure's cube is collapsed and rolled up separately,
+  then combined.
+  True single-cell cross-level merging and header styling are still unimplemented; see
+  [custom-features.md](custom-features.md#collapse) for the collapse implementation.
 
-## 6. 测试
+## 6. Tests
 
-- 上卷：行/列小计、总计、双轴交叉值、多度量按 measure 分列、叶子维度忽略、
-  全关短路、自定义 reducer 的 `colDimension` / `rowKind` / `colKind`、avg
-  加权、min/max、输入记录不被修改。
-- 布局：行/列槽位顺序、父块 size 包含汇总、三层行轴占位链、多层小计嵌套、
-  多度量列槽按 measure 展开、两块表头的 size 不变量、交叉格、纯列透视、
-  `cellMap`、`size`、`matrix = null`、`toPixel()`。
-- 渲染：fake context 下出现行/列“小计”“总计”文本，绘制格数增加。
-- 站点：Demo 的四个汇总开关组合、折叠联动（跳过折叠父级小计）和状态文案做运行验证。
+- Rollup: row/column subtotals, grand totals, two-axis intersection values,
+  multi-measure splitting by measure, ignored leaf dimensions, all-disabled short
+  circuit, custom reducer `colDimension` / `rowKind` / `colKind`, weighted avg,
+  min/max, and input records remaining unmodified.
+- Layout: row/column slot order, parent block size including totals, three-level row
+  axis placeholder chains, nested multi-level subtotals, multi-measure column slots
+  expanded per measure, size invariants across both headers, intersection cells, pure
+  column pivot, `cellMap`, `size`, `matrix = null`, and `toPixel()`.
+- Rendering: subtotal and grand-total text appears under a fake context, and the
+  number of drawn cells increases.
+- Site: runtime verification of the Demo's four total-switch combinations, collapse
+  integration (skipping collapsed-parent subtotals), and status text.
 
-## 7. 后续
+## 7. Future work
 
-1. 可选的真正跨层表头合并（核心 `depthSpan` 或 overlay）。
-2. 表头样式（overlay 或核心 `headerCellStyle` 扩展）。
-3. 折叠联动（单/多度量）已实现：折叠父级跳过小计、总计保留，上卷使用折叠后的
-   cube；剩余 cartesian 折叠。
+1. Optional true cross-level header merging (core `depthSpan` or overlay).
+2. Header styling (overlay or a core `headerCellStyle` extension).
+3. Collapse integration (single/multiple measures) is implemented: collapsed parents
+   skip subtotals, grand totals are preserved, and rollup uses the collapsed cube; the
+   remaining work is collapse in cartesian mode.

@@ -1,105 +1,125 @@
-# 多维数据到平面坐标的矩阵变换
+[English](matrix-transform.md) · [简体中文](matrix-transform.zh-CN.md)
 
-本文描述 `layoutPivot()` 如何把“每个维度组合唯一”的多维数据编码成二维整数网格坐标。聚合（`aggregate()`）不在本文范围内：布局层不做 `sum / avg / count`，只做成员索引、矩阵变换和坐标计算。
+# Matrix transform: multidimensional data to plane coordinates
 
-## 1. 输入与输出
+This document describes how `layoutPivot()` encodes multidimensional data — with one
+record per dimension combination — into two-dimensional integer grid coordinates.
+Aggregation (`aggregate()`) is out of scope here: the layout layer performs no
+`sum / avg / count`, only member indexing, matrix transformation, and coordinate
+computation.
 
-输入：
+## 1. Input and output
 
-- `rows`：聚合后的记录数组，每个维度组合只出现一次。
-- `dimensions`：`{ key, axis: 'row' | 'col', parent?, order?, compare? }[]`。
-- `value`：度量字段名，布局层只从这个字段取单元格值。
-- `mode`：`cartesian`（默认）或 `compact`。
-- `duplicate`：重复记录策略，默认 `'error'`。
+Input:
 
-输出：
+- `rows`: the aggregated record array, with each dimension combination appearing once.
+- `dimensions`: `{ key, axis: 'row' | 'col', parent?, order?, compare? }[]`.
+- `value`: the measure field name; the layout layer reads cell values only from this field.
+- `mode`: `cartesian` (default) or `compact`.
+- `duplicate`: duplicate-record policy, defaulting to `'error'`.
 
-- `size`：`{ rows, cols }`，网格尺寸。
-- `matrix`：`2 × (D + 1)` 仿射矩阵，仅 cartesian 模式有值。
-- `dimensionVectors`：每个维度对应的一列，便于渲染层逐维使用。
-- `cells`：实际存在的单元格，`{ x, y, value, members, record }`。
-- `points`：每条聚合记录的坐标、成员、索引和逐属性变换。
-- `axes.row` / `axes.col`：递归表头，成员带绝对 `offset` 和 `size`。
+Output:
 
-## 2. 符号
+- `size`: `{ rows, cols }`, the grid dimensions.
+- `matrix`: the `2 × (D + 1)` affine matrix; only populated in cartesian mode.
+- `dimensionVectors`: one column per dimension, so the render layer can use each dimension directly.
+- `cells`: the cells that actually exist, `{ x, y, value, members, record }`.
+- `points`: each aggregated record's coordinates, members, indices, and per-attribute transforms.
+- `axes.row` / `axes.col`: recursive headers whose members carry absolute `offset` and `size`.
 
-- `D`：维度数。
-- `d`：维度下标，按 `dimensions` 输入顺序从 0 开始。
-- `n_d`：维度 `d` 的成员数。
-- `i_d`：记录在维度 `d` 上的成员序号，从 0 开始。
-- `span_d`：维度 `d` 每前进一个成员，在所属轴上跨过的格数。
-- `v`：增广向量 `[i_1, i_2, ..., i_D, 1]^T`。
-- `M`：`2 × (D + 1)` 矩阵。
-- `(x, y)`：列坐标和行坐标；`x` 向右，`y` 向下。
+## 2. Notation
 
-坐标约定：`x` 对应列轴，`y` 对应行轴。某个轴没有维度时，该轴长度为 1。
+- `D`: the number of dimensions.
+- `d`: the dimension index, starting at 0 in `dimensions` input order.
+- `n_d`: the number of members in dimension `d`.
+- `i_d`: the member index of a record on dimension `d`, starting at 0.
+- `span_d`: how many cells dimension `d` advances on its axis for each member step.
+- `v`: the augmented vector `[i_1, i_2, ..., i_D, 1]^T`.
+- `M`: the `2 × (D + 1)` matrix.
+- `(x, y)`: column and row coordinates; `x` grows to the right, `y` grows downward.
 
-## 3. 成员索引
+Coordinate convention: `x` maps to the column axis, `y` maps to the row axis. An axis
+with no dimensions has length 1.
 
-布局层先对每个维度收集所有出现过的取值，用 `valueKey()` 生成稳定键，再排序：
+## 3. Member indexing
 
-1. 显式 `compare(a, b)` 优先。
-2. `order: 'asc' | 'desc'` 按数值、日期或字符串比较。
-3. 默认 `first-seen`，按首次出现顺序。
+The layout layer first collects every value that appears for each dimension, generates
+a stable key with `valueKey()`, and then sorts the members:
 
-排序后的位置就是成员序号 `i_d`。`valueKey()` 必须在聚合层和布局层使用同一套规则，否则同一个取值可能被当成两个成员。
+1. An explicit `compare(a, b)` takes priority.
+2. `order: 'asc' | 'desc'` compares numbers, dates, or strings.
+3. The default is `first-seen`, in order of first appearance.
 
-同一维度组合出现重复记录时，默认直接报错，并提示先调用 `aggregate()`。布局层不会隐式聚合，也不会在重复时随便覆盖。
+The sorted position becomes the member index `i_d`. `valueKey()` must use the same
+rules in the aggregation layer and the layout layer; otherwise the same value may be
+treated as two distinct members.
 
-## 4. 层级与跨度
+When the same dimension combination appears more than once, the default behavior is
+to throw and point the caller to `aggregate()`. The layout layer never aggregates
+implicitly, and it never silently overwrites duplicates.
 
-每个轴只支持一条层级链：一个根维度，每个维度最多一个子维度。父子维度必须在同一轴。
+## 4. Hierarchy and span
 
-叶子维度没有子维度，每个成员占 1 格：
+Each axis supports exactly one hierarchy chain: one root dimension, with at most one
+child per dimension. Parent and child dimensions must be on the same axis.
+
+A leaf dimension has no children, so each member occupies one cell:
 
 ```
 span_leaf = 1
 ```
 
-父维度的跨度等于其所有后代成员数的乘积：
+A parent dimension's span is the product of all descendant member counts:
 
 ```
-span_d = Π (n_c)   c 为 d 的后代
+span_d = Π (n_c)   c is a descendant of d
 ```
 
-等价递推：
+Equivalently, recursively:
 
 ```
 span_parent = n_child × span_child
 ```
 
-直觉：父级每变一个成员，跨过整个子块；子级在父级划出的块内细定位。因此父维度的一列永远是子维度一列的整数倍。
+Intuition: each parent member step crosses an entire child block; the child is then
+positioned within the block carved out by its parent. A parent column is therefore
+always an integer multiple of a child column.
 
-> 这里的 `n_child` 是子维度的成员总数。cartesian 模式下每个父块都补齐相同的子成员，所以 `span` 与具体父成员无关。
+> Here `n_child` is the total member count of the child dimension. In cartesian mode
+> every parent block is padded with the same child members, so `span` does not depend
+> on a specific parent member.
 
-## 5. 增广向量与矩阵
+## 5. Augmented vector and matrix
 
-记录变成增广向量：
+A record becomes an augmented vector:
 
 ```
 v = [i_1, i_2, ..., i_D, 1]^T
 [x, y]^T = M · v
 ```
 
-`M` 有 `D + 1` 列：
+`M` has `D + 1` columns:
 
-- 第 `d` 列：`span_d × u_d`，其中 `u_d` 是该维度所在轴的单位向量。
-  - 行轴：`u_d = (0, 1)^T`，列向量为 `(0, span_d)`。
-  - 列轴：`u_d = (1, 0)^T`，列向量为 `(span_d, 0)`。
-- 最后一列：平移 `(x0, y0)^T`。当前实现所有坐标从 0 开始，所以 `x0 = y0 = 0`。
+- Column `d`: `span_d × u_d`, where `u_d` is the unit vector of the dimension's axis.
+  - Row axis: `u_d = (0, 1)^T`, so the column vector is `(0, span_d)`.
+  - Column axis: `u_d = (1, 0)^T`, so the column vector is `(span_d, 0)`.
+- The last column: the translation `(x0, y0)^T`. The current implementation starts all
+  coordinates at 0, so `x0 = y0 = 0`.
 
-展开后：
+Expanded:
 
 ```
-x = Σ_{d ∈ 列轴} span_d · i_d + x0
-y = Σ_{d ∈ 行轴} span_d · i_d + y0
+x = Σ_{d ∈ column axis} span_d · i_d + x0
+y = Σ_{d ∈ row axis} span_d · i_d + y0
 ```
 
-因为每个维度只影响一个轴，`M` 的每一列（除最后一列）只有一个非零元。矩阵列顺序与 `dimensions` 输入顺序一致，记录向量的第 `d` 个分量必须使用同一个 `i_d`。
+Because each dimension affects only one axis, every column of `M` except the last has
+exactly one nonzero entry. Matrix columns follow the `dimensions` input order, and the
+`d`-th component of the record vector must use the same `i_d`.
 
-## 6. 示例
+## 6. Example
 
-配置：
+Configuration:
 
 ```js
 const dimensions = [
@@ -109,7 +129,7 @@ const dimensions = [
 ];
 ```
 
-`city` 有 3 个成员，`year` 有 2 个成员。跨度：
+`city` has 3 members and `year` has 2 members. Spans:
 
 ```
 span_city   = 1
@@ -117,7 +137,7 @@ span_region = n_city × span_city = 3
 span_year   = 1
 ```
 
-矩阵：
+Matrix:
 
 ```
         [region] [city] [year] [1]
@@ -125,45 +145,56 @@ x  =  [   0       0      1     0 ] · v
 y  =  [   3       1      0     0 ] · v
 ```
 
-验证：
+Verify:
 
-- `east / hangzhou / 2023`：`v = [0, 0, 0, 1]^T`，坐标 `(0, 0)`。
-- `east / hangzhou / 2024`：`v = [0, 0, 1, 1]^T`，坐标 `(1, 0)`。
-- `east / shanghai / 2023`：`v = [0, 1, 0, 1]^T`，坐标 `(0, 1)`。
-- `west / chengdu / 2023`：`v = [1, 0, 0, 1]^T`，坐标 `(0, 5)`。
+- `east / hangzhou / 2023`: `v = [0, 0, 0, 1]^T`, coordinates `(0, 0)`.
+- `east / hangzhou / 2024`: `v = [0, 0, 1, 1]^T`, coordinates `(1, 0)`.
+- `east / shanghai / 2023`: `v = [0, 1, 0, 1]^T`, coordinates `(0, 1)`.
+- `west / chengdu / 2023`: `v = [1, 0, 0, 1]^T`, coordinates `(0, 5)`.
 
-`region` 每变一级跨 3 行，`city` 每变一级跨 1 行。整棵树等价于混合进制解码：`region` 是高位，`city` 是低位，行坐标就是 `region × 3 + city`。
+Each `region` step crosses 3 rows, and each `city` step crosses 1 row. The whole tree
+is equivalent to mixed-radix decoding: `region` is the high-order digit, `city` is
+the low-order digit, and the row coordinate is `region × 3 + city`.
 
-## 7. cartesian 模式
+## 7. Cartesian mode
 
-- 每个父成员下补齐该子维度的全部成员，即使某些组合在数据中没有出现。
-- 每个父块大小相同，因此存在全局固定矩阵 `M`。
-- `span_d` 与具体父成员无关，矩阵列之间严格成比例。
-- `cells` 只包含实际出现的记录；`size` 包含补齐后的完整网格。渲染层用 `size` 和 `cells` 判断空单元格。
-- 成员序号 `i_d` 是全局成员序。由于每个父块补齐相同的子成员，`i_d × span_d` 正好等于该维度在父块内偏移的累加，所以可以直接用矩阵乘索引向量。
+- Every parent member is padded with all members of its child dimension, even when some
+  combinations never appear in the data.
+- Every parent block has the same size, so a single global matrix `M` exists.
+- `span_d` does not depend on a specific parent member, and matrix columns stay strictly
+  proportional.
+- `cells` contains only records that actually appear; `size` describes the full padded
+  grid. The render layer uses `size` and `cells` to identify empty cells.
+- The member index `i_d` is a global member index. Since every parent block is padded
+  with the same child members, `i_d × span_d` equals the accumulated offset of that
+  dimension within the parent block, so the index vector can be multiplied directly.
 
-## 8. compact 模式
+## 8. Compact mode
 
-- 只排列数据中实际出现的成员组合，父成员块大小可变。
-- 不存在全局固定矩阵，`matrix` 为 `null`。
-- 每条记录的 `points[].transforms` 给出逐属性的平移：
+- Only member combinations that actually appear in the data are laid out, so parent
+  blocks can have different sizes.
+- No global fixed matrix exists, and `matrix` is `null`.
+- Each record's `points[].transforms` provides its per-attribute translation:
 
 ```js
 {
   key: 'city',
   axis: 'row',
-  memberOffset: 1,      // 该成员在父块内的相对偏移
-  vector: [0, 1],       // 行轴为 (0, offset)，列轴为 (offset, 0)
+  memberOffset: 1,      // relative offset of the member within its parent block
+  vector: [0, 1],       // (0, offset) on the row axis, (offset, 0) on the column axis
 }
 ```
 
-- 记录的坐标等于所有 `transforms[].vector` 之和，根块从 0 开始。
-- 可以把 compact 看作“逐记录的分段平移变换”：每条记录有自己的平移量，而不是共享一个 `M`。
-- `axes.*.header` 仍给出每个成员的绝对 `offset` 和 `size`，但不同父块下的子成员 `offset` 不再满足统一比例。
+- A record's coordinates are the sum of all `transforms[].vector` entries, starting
+  from 0 at the root block.
+- Compact mode can be seen as a per-record piecewise translation: each record carries
+  its own translation instead of sharing one `M`.
+- `axes.*.header` still provides each member's absolute `offset` and `size`, but child
+  members under different parent blocks no longer follow a uniform ratio.
 
-## 9. 表头与矩阵的关系
+## 9. Relationship between headers and the matrix
 
-`axes.row.header` 和 `axes.col.header` 是递归结构：
+`axes.row.header` and `axes.col.header` are recursive structures:
 
 ```js
 {
@@ -176,42 +207,61 @@ y  =  [   3       1      0     0 ] · v
 }
 ```
 
-- `offset`：成员沿该轴的绝对起始格，从 0 开始。
-- `size`：成员跨过的格数。
-- 子成员的 `offset` 以父块起点为基准再累加，因此可以直接用于 `rowspan` / `colspan` 渲染。
-- `matrix` 描述“记录 → 坐标”，`header` 描述“成员 → 区间”。两者必须使用同一套 `span`，否则表头和单元格会错位。
+- `offset`: the member's absolute starting cell along the axis, starting at 0.
+- `size`: the number of cells the member spans.
+- A child member's `offset` is accumulated relative to its parent block's start, so it
+  can be used directly for `rowspan` / `colspan` rendering.
+- `matrix` describes "record → coordinates"; `header` describes "member → interval".
+  Both must use the same `span` values, or headers and cells will be misaligned.
 
-## 10. 复杂度
+## 10. Complexity
 
-设 `m` 为聚合后的记录数，`D` 为维度数，`C` 为实际单元格数。
+Let `m` be the number of aggregated records, `D` the number of dimensions, and `C` the
+number of actual cells.
 
-- 成员收集：每个维度扫描一遍聚合数据，约 `O(m × D)`。
-- 层级树构建：每层处理自己的记录子集，约 `O(m × D)`；cartesian 模式补齐空成员会增加节点数，但不增加记录数。
-- 记录定位与单元格生成：约 `O(m × D)`。
-- 空间：聚合结果、层级树、`cells`、`points` 和表头节点，约 `O(m × D + C)`。
-- 矩阵本身只占 `O(D)`。
+- Member collection: one scan of the aggregated data per dimension, about `O(m × D)`.
+- Hierarchy tree construction: each level processes its own record subset, about
+  `O(m × D)`; cartesian padding adds nodes but not records.
+- Record location and cell generation: about `O(m × D)`.
+- Space: aggregated results, hierarchy trees, `cells`, `points`, and header nodes, about
+  `O(m × D + C)`.
+- The matrix itself occupies only `O(D)`.
 
-compact 模式省掉补齐的空单元格，但 `points` 和 `transforms` 仍按记录数增长。真正的性能瓶颈通常来自明细数据量 `N`；先聚合把 `N` 压成 `m` 后，布局阶段只处理聚合结果，这是推荐的两阶段流程。
+Compact mode avoids padded empty cells, but `points` and `transforms` still grow with
+the record count. The real bottleneck is usually the detail row count `N`; aggregating
+first reduces `N` to `m`, so the layout stage only processes aggregated results. This
+is the recommended two-stage pipeline.
 
-## 11. 约束与边界
+## 11. Constraints and boundaries
 
-- 每个轴恰好一条链：单根、每个父最多一个子维度。多根、多叉、环、跨轴父子都会显式报错。
-- `dimensions` 必填；每个维度必须显式指定 `axis: 'row' | 'col'`。父子关系用 `parent` 显式给出，根维度省略 `parent`。
-- `value` 必填；布局层只读取该字段，不做聚合。
-- 重复维度组合默认报错；也可显式指定 `duplicate: 'first' | 'last'`，但推荐先调用 `aggregate()`。
-- 输出是整数网格坐标与二维向量；像素换算交给渲染层的 `computePivotGeometry()`，`result.toPixel({ width, height })` 保留为简单的等距换算辅助。
-- 当前平移为 0。若未来支持自定义原点，只需修改 `M` 的最后一列，不影响 `span` 结构。
+- Exactly one chain per axis: a single root, with at most one child dimension per
+  parent. Multiple roots, multiple children, cycles, and cross-axis parent-child
+  relationships all throw explicit errors.
+- `dimensions` is required; every dimension must specify `axis: 'row' | 'col'`.
+  Parent-child relationships are declared with `parent`; root dimensions omit it.
+- `value` is required; the layout layer reads only that field and never aggregates.
+- Duplicate dimension combinations throw by default; `duplicate: 'first' | 'last'` can
+  be set explicitly, but calling `aggregate()` first is recommended.
+- Output consists of integer grid coordinates and 2D vectors. Pixel conversion belongs
+  to the render layer's `computePivotGeometry()`; `result.toPixel({ width, height })`
+  remains as a simple equidistant conversion helper.
+- The current translation is 0. Supporting a custom origin in the future requires
+  changing only the last column of `M`, with no impact on the `span` structure.
 
-## 12. 实现映射
+## 12. Implementation map
 
-- `src/model/aggregate.mjs`：聚合层，把明细压成每个维度组合唯一的数据。
-- `src/model/pivot-layout.mjs`：
-  - `normalizeDimensions` / `buildChain`：维度校验与单链检查。
-  - `collectMembers`：成员收集、稳定键和排序。
-  - `buildLevel`：递归构建层级树，计算每个成员的 `size` 和 `offset`。
-  - `locate`：记录 → 层级路径与绝对坐标。
-  - `layoutPivot` 内部的 `spans` Map 与 `matrix` 构造：全局矩阵。
-  - `axisResult` / `headerOf`：递归表头。
-  - `toPixel`：网格坐标到像素坐标的简单辅助函数。
-- `src/render/geometry.mjs`：屏幕矩形、可见范围、冻结表头与裁剪区域。
-- `src/render/canvas-renderer.mjs`：Canvas 2D 绘制，只遍历视口内单元格。
+- `src/model/aggregate.mjs`: the aggregation layer, which reduces detail rows to one
+  record per dimension combination.
+- `src/model/pivot-layout.mjs`:
+  - `normalizeDimensions` / `buildChain`: dimension validation and single-chain checks.
+  - `collectMembers`: member collection, stable keys, and sorting.
+  - `buildLevel`: recursive hierarchy-tree construction, computing each member's `size`
+    and `offset`.
+  - `locate`: record → hierarchy path and absolute coordinates.
+  - The `spans` Map and `matrix` construction inside `layoutPivot`: the global matrix.
+  - `axisResult` / `headerOf`: recursive headers.
+  - `toPixel`: a simple helper from grid coordinates to pixel coordinates.
+- `src/render/geometry.mjs`: screen rectangles, visible ranges, frozen headers, and clip
+  regions.
+- `src/render/canvas-renderer.mjs`: Canvas 2D drawing, iterating only over cells inside
+  the viewport.

@@ -1,25 +1,36 @@
-# 附加功能架构设计（设计稿）
+[English](features-architecture.md) · [简体中文](features-architecture.zh-CN.md)
 
-- **状态**：设计稿；并列度量、热力图、自定义叠加渲染示例、自定义 feature 示例（cell-marker）、行/列小计/总计（含双轴交叉与多度量分列）、悬浮滚动条、折叠 / 展开（compact，可与行/列汇总、并列度量共存）已实现，核心旧热力图已移除；跨层单格合并、cartesian 的折叠仍未实现。
-- **日期**：2026-11-02
-- **范围**：并列度量、热力图、小计 / 总计、折叠 / 展开，以及后续基于核心的附加能力。
-- **核心原则**：核心算法冻结；附加功能只做组合、派生和适配。
+# Feature architecture design (design note)
 
-## 1. 目标
+- **Status**: Design note. Dual measures, heatmaps, the custom overlay rendering
+  example, the custom feature example (cell-marker), row/column subtotals/grand totals
+  (including two-axis intersections and multi-measure splitting), floating scrollbars,
+  and expand/collapse (compact; compatible with row/column totals and dual measures) are
+  implemented. The old core heatmap has been removed. Cross-level single-cell merging
+  and collapse in cartesian mode are still unimplemented.
+- **Date**: 2026-11-02
+- **Scope**: Dual measures, heatmaps, subtotals/grand totals, expand/collapse, and
+  future add-on capabilities built on the core.
+- **Core principle**: The core algorithms are frozen; add-on features only compose,
+  derive, and adapt.
 
-在不修改核心算法的前提下，为透视表增加产品级能力：
+## 1. Goals
 
-- 小计 / 总计
-- 折叠 / 展开
-- 后续的排序、合并、导出、交互装饰等
+Add product-level capabilities to the pivot table without modifying core algorithms:
 
-这些能力应当可以被 `site/`、`examples/` 或未来的其他使用方复用，而不是绑死在演示页面里。
+- subtotals / grand totals
+- expand / collapse
+- future sorting, merging, export, interaction decorations, and so on
 
-## 2. 核心边界
+These capabilities should be reusable by `site/`, `examples/`, or future consumers
+rather than being hard-wired into the demo page.
 
-### 2.1 冻结内容
+## 2. Core boundaries
 
-以下模块的算法、函数签名、默认行为和输出结构保持稳定：
+### 2.1 Frozen content
+
+The algorithms, function signatures, default behavior, and output structures of these
+modules stay stable:
 
 - `src/model/aggregate.mjs`
 - `src/model/pivot-layout.mjs`
@@ -28,276 +39,343 @@
 - `src/render/canvas-renderer.mjs`
 - `src/render/theme.mjs`
 
-核心入口 `src/model/index.mjs`、`src/render/index.mjs` 不感知附加功能。
+The core entry points `src/model/index.mjs` and `src/render/index.mjs` know nothing
+about add-on features.
 
-> 例外：2026-10-31 经明确同意，移除核心 `heatmap` 选项、主题色板与相关测试，
-> 热力图完全迁入 `src/features/heatmap.mjs`。核心矩阵/几何与其余渲染行为不变，
-> 后续继续按冻结规则执行。
+> Exception: on 2026-10-31, with explicit approval, the core `heatmap` option, theme
+> palettes, and related tests were removed, and heatmaps moved entirely into
+> `src/features/heatmap.mjs`. The core matrix/geometry and remaining render behavior
+> are unchanged, and the freeze rules continue to apply.
 
-### 2.2 允许的变更
+### 2.2 Allowed changes
 
-- 新增独立的 feature 模块、入口、测试和文档。
-- 在站点层增加控件、状态和 feature 编排。
-- 如果现有核心能力确实不足，先提出向后兼容的扩展方案，说明影响面并等待确认；默认不直接改核心。
-- 不为了让某个 feature 通过而修改核心的默认输出。
+- Add independent feature modules, entry points, tests, and documentation.
+- Add controls, state, and feature orchestration in the site layer.
+- If existing core capabilities are genuinely insufficient, propose a
+  backward-compatible extension first, describe the impact, and wait for confirmation;
+  do not change the core by default.
+- Never change core default output to make a feature pass.
 
-## 3. 目录规划
+## 3. Directory plan
 
-并列度量、热力图、自定义叠加渲染示例、行/列小计/总计和悬浮滚动条已落地；其余目录在对应功能实现时再创建：
+Dual measures, heatmaps, the custom overlay rendering example, row/column
+subtotals/grand totals, and floating scrollbars are implemented; other directories are
+created when the corresponding feature lands:
 
 ```
 src/
-  model/         核心：聚合、矩阵布局（冻结）
-  render/        核心：几何、Canvas、主题（冻结）
-  features/      附加业务能力
-    dual-measure.mjs  已实现：并列度量布局
-    heatmap.mjs       已实现：热力图渲染
-    cell-marker.mjs   已实现：自定义 feature 示例（cellStyle + overlay）
-    collapse.mjs      已实现：展开 / 折叠（compact，可与汇总/多度量共存）
-    overlay.mjs       已实现：自定义叠加渲染（角区示例）
-    scrollbar.mjs     已实现：悬浮滚动条（绘制 + 命中测试 + 拖拽换算）
-    totals.mjs        已实现：行/列小计/总计（含双轴交叉）
-    index.mjs         可选：feature 统一入口（尚未创建）
+  model/         core: aggregation, matrix layout (frozen)
+  render/        core: geometry, Canvas, theme (frozen)
+  features/      add-on business capabilities
+    dual-measure.mjs  implemented: dual-measure layout
+    heatmap.mjs       implemented: heatmap rendering
+    cell-marker.mjs   implemented: custom feature example (cellStyle + overlay)
+    collapse.mjs      implemented: expand / collapse (compact; works with totals/dual measures)
+    overlay.mjs       implemented: custom overlay rendering (corner example)
+    scrollbar.mjs     implemented: floating scrollbars (draw + hit test + drag conversion)
+    totals.mjs        implemented: row/column subtotals/grand totals (including two-axis intersections)
+    index.mjs         optional: unified feature entry point (not created yet)
 test/
   features/
-    dual-measure.test.mjs  已实现
-    heatmap.test.mjs       已实现
-    cell-marker.test.mjs   已实现
-    collapse.test.mjs      已实现
-    overlay.test.mjs       已实现
-    scrollbar.test.mjs     已实现
-    totals.test.mjs        已实现
+    dual-measure.test.mjs  implemented
+    heatmap.test.mjs       implemented
+    cell-marker.test.mjs   implemented
+    collapse.test.mjs      implemented
+    overlay.test.mjs       implemented
+    scrollbar.test.mjs     implemented
+    totals.test.mjs        implemented
   site/
-    code-examples.test.mjs 已实现
-  architecture.test.mjs    已实现：依赖方向守卫
+    code-examples.test.mjs implemented
+  architecture.test.mjs    implemented: dependency-direction guard
 ```
 
-文件名先保持扁平；单个 feature 变大后再拆成 `features/subtotals/` 等子目录。
+File names stay flat for now; when a single feature grows large, split it into
+subdirectories such as `features/subtotals/`.
 
-## 3.1 已实现：并列度量
+## 3.1 Implemented: dual measures
 
-`src/features/dual-measure.mjs` 把多个 aggregate 结果展开成长表，并把
-“度量”作为列轴最末一层维度，再交给核心 `layoutPivot`。
+`src/features/dual-measure.mjs` expands multiple aggregate results into a long table,
+treats "measure" as the last column-axis dimension, and hands the result to core
+`layoutPivot`.
 
-- 输入：`dimensions` + `measures: [{ label, rows, valueField }]`；
-- 输出：长表 `rows`、追加 measure 维度的 `dimensions`、`value` 字段名；
-- 核心矩阵、表头、`cellMap` 与渲染器均未修改；
-- 并列度量本身只处理布局；热力图由独立 feature 按 measure 分别计算；
-- 核心旧热力图已移除，热力图逻辑全部在 `src/features/heatmap.mjs`；
-- 架构守卫测试确保 `src/model` / `src/render` 不反向依赖 `features`。
+- Input: `dimensions` + `measures: [{ label, rows, valueField }]`;
+- Output: long-table `rows`, `dimensions` with the measure dimension appended, and the
+  `value` field name;
+- Core matrix, headers, `cellMap`, and the renderer are unchanged;
+- Dual measures handle layout only; heatmaps are computed per measure by a separate
+  feature;
+- The old core heatmap has been removed, and all heatmap logic lives in
+  `src/features/heatmap.mjs`;
+- Architecture guard tests ensure `src/model` / `src/render` never depend on
+  `features`.
 
-## 3.2 已实现：热力图 feature
+## 3.2 Implemented: heatmap feature
 
-`src/features/heatmap.mjs` 通过核心已有的 `cellStyle` 回调渲染，不修改核心
-renderer 的绘制路径。
+`src/features/heatmap.mjs` renders through the core's existing `cellStyle` callback and
+does not modify the core renderer's drawing path.
 
-- 单度量布局：所有数值共用一个 min/max；
-- 并列度量布局：按 `measure` 维度分别计算 min/max 和色阶，互不干扰；
-- 空值 / 非数值单元格返回 `undefined`，交回核心默认样式；
-- Demo 通过 `cellStyle` 使用 feature；核心 renderer 不再包含热力图选项；
-- 核心只保留 `cellStyle` / `formatValue` 这类通用扩展点。
+- Single-measure layout: all values share one min/max;
+- Dual-measure layout: min/max and color scales are computed separately per `measure`
+  dimension without interference;
+- Empty / non-numeric cells return `undefined`, falling back to core default styling;
+- The Demo uses the feature through `cellStyle`; the core renderer no longer contains a
+  heatmap option;
+- The core keeps only general extension points such as `cellStyle` / `formatValue`.
 
-## 3.3 已实现：自定义叠加渲染（示例）
+## 3.3 Implemented: custom overlay rendering (example)
 
-`src/features/overlay.mjs` 在核心 `renderPivot` 结束后，把同一个 2D context
-交给调用方的 `draw` 回调，用于角标、参考线、图标、选中框等装饰。
+`src/features/overlay.mjs` hands the same 2D context to the caller's `draw` callback
+after core `renderPivot` finishes, for badges, reference lines, icons, selection
+outlines, and similar decorations.
 
-- `renderWithOverlay(target, layout, options, draw)`：通用入口，先核心、后自定义；
-- `createCornerLabels(options)`：内置示例，在冻结角区画行/列维度名；
-- 核心几何、绘制顺序和默认输出不变，overlay 始终位于最上层；
-- `draw` 使用与核心相同的 CSS 像素坐标系，DPR 变换已由核心处理；
-- 角区为空（纯行 / 纯列透视）时示例直接跳过，过窄时省略号截断；
-- feature 只读取 `layout` / `geometry`，不修改核心对象；
-- Demo 通过 `[data-demo-overlay]` 开关接入，关闭时仍走核心 `renderPivot`。
+- `renderWithOverlay(target, layout, options, draw)`: general entry point; core first,
+  custom drawing after;
+- `createCornerLabels(options)`: built-in example that draws row/column dimension names
+  in the frozen corner area;
+- Core geometry, draw order, and default output are unchanged, and overlays always sit
+  on top;
+- `draw` uses the same CSS pixel coordinate system as the core; the DPR transform is
+  already handled by the core;
+- The example skips an empty corner (pure row / pure column pivot) and truncates with an
+  ellipsis when too narrow;
+- The feature only reads `layout` / `geometry` and never mutates core objects;
+- The Demo wires it through the `[data-demo-overlay]` switch; when off, core
+  `renderPivot` is used directly.
 
-## 3.4 已实现：行 / 列小计与总计（含双轴交叉）
+## 3.4 Implemented: row/column subtotals and grand totals (with two-axis intersections)
 
-`src/features/totals.mjs` 分两步，核心 `aggregate` / `layoutPivot` /
-`renderPivot` 均不修改：
+`src/features/totals.mjs` works in two steps, and core `aggregate` / `layoutPivot` /
+`renderPivot` are unchanged:
 
-- `rollupTotals(cube, config)`：读取核心聚合结果，按 `rows` / `cols` 配置
-  统一上卷，输出独立的行 × 列汇总立方体；不生成布局行，不修改 cube。
-- `rollupMultiTotals(measures, config)`：对每个度量分别上卷，把度量 label
-  追加到列路径，列小计/总计按 measure 分列，不把不同度量相加。
-- `withTotals(layout, rolled, options)`：路线 B，在基础布局上同时插入行/列
-  小计与总计，重建两块表头、`cells`、`cellMap`、`size`；`matrix` 置 `null`。
-- 行/列都走父块内小计：父 `size` 覆盖汇总行/列，子层显示“小计”；总计行的
-  深层用空占位 children 链填满。
-- 支持行小计 × 列小计、行小计 × 列总计、行总计 × 列小计和右下角全局总计。
-- 内置 `sum / count / avg / min / max` 上卷规则；`avg` 用 `__valueCount`
-  加权；可传纯函数 `reduce(records, context)` 覆盖。
-- 开关在 site 层翻译成配置；全关时 `skipped: true`，布局层原样返回。
-- 多度量时，列小计/总计按 measure 分列；行汇总行覆盖所有度量列。
-- 折叠联动：折叠父级跳过小计，总计保留；详见 3.7。
-- 真正的跨层单格合并、表头样式后续。
-- 行轴兼容入口 `rollupRowTotals()` / `withRowTotals()` 仍保留。
-- 设计与边界见 `docs/totals.md`。
+- `rollupTotals(cube, config)`: reads the core aggregation result, rolls up uniformly
+  according to `rows` / `cols`, and outputs an independent row × column rollup cube; it
+  generates no layout rows and does not modify the cube.
+- `rollupMultiTotals(measures, config)`: rolls up each measure separately, appends the
+  measure label to the column path, splits column subtotals/totals by measure, and never
+  adds different measures together.
+- `withTotals(layout, rolled, options)`: route B, inserting row/column subtotals and
+  grand totals into the base layout at once and rebuilding both header blocks, `cells`,
+  `cellMap`, and `size`; sets `matrix` to `null`.
+- Rows and columns both use in-parent-block subtotals: the parent `size` covers the
+  subtotal rows/columns, child levels show the subtotal label (Chinese `小计` by
+  default), and deeper levels of grand-total
+  rows are filled with empty placeholder child chains.
+- Supports row subtotal × column subtotal, row subtotal × column total, row total ×
+  column subtotal, and the global total at the bottom right.
+- Built-in rollup rules: `sum / count / avg / min / max`; `avg` is weighted by
+  `__valueCount`; a pure `reduce(records, context)` function can override them.
+- Switches are translated into configuration at the site layer; when all are off,
+  `skipped: true` and the layout layer returns the input unchanged.
+- With multiple measures, column subtotals/totals are split by measure, and row total
+  rows cover all measure columns.
+- Collapse integration: collapsed parents skip subtotals while grand totals are
+  preserved; see 3.7.
+- True cross-level single-cell merging and header styling remain future work.
+- The row-axis compatibility entry points `rollupRowTotals()` / `withRowTotals()` are
+  still available.
+- See `docs/totals.md` for the design and boundaries.
 
-## 3.5 已实现：悬浮滚动条
+## 3.5 Implemented: floating scrollbars
 
-`src/features/scrollbar.mjs` 在核心绘制后叠加滚动条，不修改核心几何与布局：
+`src/features/scrollbar.mjs` overlays scrollbars after core drawing without modifying
+core geometry or layout:
 
-- `computeScrollbarGeometry(geometry, options)`：根据核心 `viewport /
-  dataOrigin / dataSize / dataViewport` 计算两条轨道和 thumb；
-- `hitTestScrollbars(bars, x, y)`：区分 thumb / track，轨道外返回 `null`；
-- `scrollFromThumbPosition(bar, pointer, grabOffset)`：把指针位置换算回滚动偏移；
-- `drawScrollbars(ctx, geometry, options, state)`：绘制轨道和 thumb，支持
-  hover / active 颜色和 `opacity` 淡出；
-- `createScrollbarOverlay(options)`：封装成 overlay 的 draw 函数，并缓存最近一次
-  几何供站点层命中测试；
-- `createScrollbarAutoHide({ delay, fadeDuration })`：纯时间状态机，提供
-  `show()` / `setPinned()` / `opacity()` / `isActive()`，不依赖 DOM；
-- 轨道从数据区起点开始，避开冻结表头；两个方向都可滚动时右下角留空；内容
-  不足一个视口时自动隐藏；
-- Demo 默认启用；滚动 / 拖动后显示，停止操作约 900ms 后淡出，悬停或拖动
-  滚动条时保持显示；自动隐藏后仍可命中用于悬停唤醒，但 pointerdown 仅在
-  透明度大于 0.05 时拖动滚动条；
-- Demo 中指针命中滚动条时优先拖动滚动条，否则继续拖拽平移。
+- `computeScrollbarGeometry(geometry, options)`: computes both tracks and thumbs from
+  the core `viewport / dataOrigin / dataSize / dataViewport`;
+- `hitTestScrollbars(bars, x, y)`: distinguishes thumb / track and returns `null`
+  outside the track;
+- `scrollFromThumbPosition(bar, pointer, grabOffset)`: converts a pointer position back
+  into a scroll offset;
+- `drawScrollbars(ctx, geometry, options, state)`: draws tracks and thumbs, supports
+  hover / active colors and `opacity` fading;
+- `createScrollbarOverlay(options)`: wraps this as an overlay draw function and caches
+  the latest geometry for site-layer hit testing;
+- `createScrollbarAutoHide({ delay, fadeDuration })`: a pure time state machine exposing
+  `show()` / `setPinned()` / `opacity()` / `isActive()`, with no DOM dependency;
+- Tracks start at the data-area origin, avoiding frozen headers; the bottom-right corner
+  is left empty when both axes can scroll; scrollbars hide automatically when content
+  fits within one viewport;
+- Enabled by default in the Demo; they appear after scrolling / dragging, fade about
+  900ms after the last operation, and stay visible while hovering or dragging a
+  scrollbar; hidden bars remain hittable for hover wake-up, but pointerdown only drags
+  them when opacity is greater than 0.05;
+- In the Demo, pointer hits on scrollbars take priority; otherwise canvas panning
+  continues.
 
-## 3.6 已实现：自定义 feature 示例（cell-marker）
+## 3.6 Implemented: custom feature example (cell-marker)
 
-`src/features/cell-marker.mjs` 是编写自定义 feature 的最小完整示例：
+`src/features/cell-marker.mjs` is the smallest complete example of writing a custom
+feature:
 
-- `createCellMarker(layout, { test, ... })` 返回 `cellStyle` 与 `draw`；
-- `cellStyle` 给命中谓词的格子返回背景 / 文字色；
-- `draw` 在 `renderWithOverlay` 后绘制右上角标记，只遍历 `geometry.visible`，
-  并用 `dataClip` 裁剪；
-- Demo 用“高值标记”开关接入，阈值取当前布局数值的 80 分位；
-- 页面 `#quickstart` 的“自定义 feature”卡片提供数据派生、布局派生、
-  渲染配置、overlay 和交互等挂载点的文档入口；
-- 完整说明见 [custom-features.md](custom-features.md)。
+- `createCellMarker(layout, { test, ... })` returns `cellStyle` and `draw`;
+- `cellStyle` returns background / text colors for cells matching the predicate;
+- `draw` adds a top-right marker after `renderWithOverlay`, iterating only over
+  `geometry.visible` and clipping with `dataClip`;
+- The Demo wires it through the "High-value markers" switch, using the 80th percentile
+  of the current layout's values as the threshold;
+- The "Custom feature" card under `#quickstart` links to documentation for data
+  derivation, layout derivation, render configuration, overlay, and interaction mount
+  points;
+- See [custom-features.md](custom-features.md) for the complete guide.
 
-## 3.7 已实现：展开 / 折叠（compact，可与汇总/多度量共存）
+## 3.7 Implemented: expand / collapse (compact; works with totals and dual measures)
 
-`src/features/collapse.mjs` 在 aggregate 之后派生折叠数据，核心布局 / 渲染不改：
+`src/features/collapse.mjs` derives collapsed data after aggregate; core layout and
+rendering are unchanged:
 
-- `collapseCube(cube, collapsed)`：按 `collapseKey(axis, dimension, value)` 找到第一个被折叠的父成员，把其子维度替换为 `（全部）`，并按度量重新上卷；avg 用 `__valueCount` 加权；
-- `hitTestHeader(layout, geometry, point, { canCollapse })`：命中行 / 列父表头，
-  返回 `axis / dimension / value / key`；
-- `drawCollapseIndicators(ctx, { layout, geometry, collapsed, canCollapse })`：
-  在父表头右侧画 + / −；多度量下屏蔽 `measure` 及其直接父维度；
-- Demo“折叠模式”开启后点击父表头切换，关闭时清除状态并恢复完整布局；
-- 当前只支持 compact；可与行/列汇总、并列度量同时使用，折叠父级跳过小计、总计保留；
-  多度量时对每个 measure 的 cube 分别折叠，再 combineMeasures；
-  measure 及其直接父维度不参与折叠，用 `canCollapse` 过滤；cartesian 暂不叠加；
-- 测试见 `test/features/collapse.test.mjs`；完整挂载点说明见
-  [custom-features.md](custom-features.md#collapse)。
+- `collapseCube(cube, collapsed)`: finds the first collapsed parent member by
+  `collapseKey(axis, dimension, value)`, replaces its child dimension with `（全部）`,
+  and re-rolls up per measure; avg is weighted by `__valueCount`;
+- `hitTestHeader(layout, geometry, point, { canCollapse })`: hits row / column parent
+  headers and returns `axis / dimension / value / key`;
+- `drawCollapseIndicators(ctx, { layout, geometry, collapsed, canCollapse })`: draws
+  + / − to the right of parent headers; with multiple measures it masks `measure` and
+  its direct parent dimension;
+- Turning on "Collapse mode" in the Demo lets parent-header clicks toggle collapse;
+  turning it off clears state and restores the full layout;
+- It currently supports compact mode only; it can be combined with row/column totals and
+  dual measures, with collapsed parents skipping subtotals while grand totals are
+  preserved; with multiple measures, collapse each measure's cube separately before
+  `combineMeasures`; `measure` and its direct parent dimension do not take part in
+  collapse and are filtered with `canCollapse`; cartesian mode is not stacked yet;
+- Tests live in `test/features/collapse.test.mjs`; see
+  [custom-features.md](custom-features.md#collapse) for the complete mount-point guide.
 
-## 4. 依赖规则
+## 4. Dependency rules
 
 ```
 site / examples / bench
           ↓
        features
           ↓
-    model / render        （核心）
+    model / render        (core)
 ```
 
-- `features` 可以 import 核心。
-- `model` 与 `render` 禁止 import `features`。
-- `site` 只负责 UI 绑定和 feature 编排，不承载可复用的业务算法。
-- `features/index.mjs` 只导出 feature API，不改变核心入口。
-- 可选地增加 `test/architecture.test.mjs`，静态扫描 `src/model` 与 `src/render` 的 import，发现反向依赖即失败。边界用测试机制守住，不靠口头约定。
+- `features` may import the core.
+- `model` and `render` must not import `features`.
+- `site` only handles UI binding and feature orchestration; it does not own reusable
+  business algorithms.
+- `features/index.mjs` only exports feature APIs and does not change core entry points.
+- Optionally add `test/architecture.test.mjs` to statically scan imports in
+  `src/model` and `src/render` and fail on reverse dependencies. Boundaries are kept by
+  tests, not by verbal agreement.
 
-## 5. 功能接入方式
+## 5. How features plug in
 
-### 5.1 小计 / 总计
+### 5.1 Subtotals / grand totals
 
-首选方式：
+Preferred approach:
 
-1. feature 层读取核心的聚合结果与布局结果，只读消费。
-2. 构造 feature 自己的“展示布局”：在基础布局上插入汇总行/列，重新计算表头、`size`、`cells`、`cellMap` 等展示结构。
-3. 核心布局对象不被修改；核心 `layoutPivot` 不增加汇总逻辑。
-4. 渲染层只接收 feature 产出的、符合既有契约的布局对象。
+1. The feature layer reads core aggregation and layout results, consuming them read-only.
+2. Build a feature-owned "display layout": insert total rows/columns into the base
+   layout, and recompute headers, `size`, `cells`, `cellMap`, and other display
+   structures.
+3. Core layout objects are not mutated; core `layoutPivot` does not grow total logic.
+4. The render layer receives only layout objects produced by the feature that satisfy
+   the existing contract.
 
-备选方式：
+Alternative approach:
 
-- 包装聚合数据后重新调用一次核心 `layoutPivot`。
-- 只有在不引入核心改动、且表头与坐标严格正确时采用；否则回到展示布局派生。
+- Wrap the aggregated data and call core `layoutPivot` again.
+- Only use it when it introduces no core changes and headers and coordinates are
+  strictly correct; otherwise return to display-layout derivation.
 
-实现该功能前，需要单独设计并验证：
+Before implementing this feature, design and verify separately:
 
-- 汇总行/列与原始行列的 `offset / size` 关系；
-- 分组父子层级下的汇总位置；
-- 汇总单元格的命中测试和渲染装饰；
-- 空数据、单成员、compact 布局等边界。
+- the `offset / size` relationship between total rows/columns and original rows/columns;
+- total placement under grouped parent-child hierarchies;
+- hit testing and render decoration for total cells;
+- boundaries such as empty data, a single member, and compact layouts.
 
-行轴/列轴都已按这个方式落地（见 3.4）：`rollupTotals()` 只读 cube 上卷，
-`withTotals()` 只读 layout 派生展示布局；上卷规则可配置为纯函数。
+Both row and column axes are implemented this way (see 3.4): `rollupTotals()` only reads
+the cube to roll up, `withTotals()` only reads the layout to derive the display layout,
+and rollup rules can be configured as pure functions.
 
-### 5.2 折叠 / 展开
+### 5.2 Expand / collapse
 
-- feature 层维护折叠路径集合和 UI 状态。
-- 折叠后的可见数据通过过滤或上卷得到；feature 可以重新调用核心 `layoutPivot` 生成新的完整布局。
-- 核心始终按传入数据生成布局，不感知“折叠”概念。
-- 展开时恢复被过滤的成员，再重新布局。
-- 折叠图标、命中区域和状态变化属于 feature / 渲染装饰层，不进入核心 renderer。
+- The feature layer maintains the set of collapsed paths and UI state.
+- Collapsed visible data is obtained by filtering or rolling up; the feature may call
+  core `layoutPivot` again to produce a new complete layout.
+- The core always lays out the data it is given and knows nothing about "collapse".
+- Expanding restores filtered members and re-runs layout.
+- Collapse icons, hit areas, and state changes belong to the feature / render decoration
+  layer and never enter the core renderer.
 
-### 5.3 渲染装饰
+### 5.3 Render decoration
 
-优先复用核心已有的扩展点：
+Prefer reusing existing core extension points:
 
-- `formatValue`：汇总值、空值、特殊文本；
-- `cellStyle`：汇总底色、突出文字、斑马纹覆盖；
-- 核心 `geometry`：计算图标、分隔线、命中区域的位置。
+- `formatValue`: total values, empty values, special text;
+- `cellStyle`: total backgrounds, emphasized text, zebra-stripe overrides;
+- Core `geometry`: computing positions for icons, separators, and hit areas.
 
-如果这些不够：
+If these are insufficient:
 
-- feature 提供自己的 Canvas 装饰绘制函数，在核心 `renderPivot` 之后叠加；
-- 或由 feature 包一层渲染协调器，但核心 renderer 的默认行为保持不变。
+- The feature provides its own Canvas decoration function, overlaid after core
+  `renderPivot`;
+- Or the feature wraps a render coordinator, while core renderer default behavior stays
+  unchanged.
 
-不修改 `renderPivot` 的默认绘制顺序和核心几何算法来迁就某个 feature。
+Never change `renderPivot`'s default draw order or core geometry algorithms to
+accommodate a feature.
 
-### 5.4 站点接入
+### 5.4 Site integration
 
-- `site/demo.mjs` 负责把 feature 状态、控件和渲染串起来。
-- 页面新增开关时，只增加控件与状态绑定。
-- 核心与 feature 都可以在没有站点的情况下独立测试。
+- `site/demo.mjs` connects feature state, controls, and rendering.
+- When the page gains a switch, only add the control and its state binding.
+- Both core and features can be tested independently of the site.
 
-## 6. 测试策略
+## 6. Testing strategy
 
-- 核心测试保持原样，feature 不能要求修改核心断言。
-- 每个 feature 在 `test/features/` 下独立测试。
-- feature 测试覆盖：
-  - 数据/布局派生结果；
-  - 与核心布局组合后的坐标、表头和单元格；
-  - 折叠/展开状态切换；
-  - 渲染回调与装饰调用。
-- 每次改动同时运行核心测试和 feature 测试。
-- 可选架构守卫测试：
-  - core 目录不得出现 `features/` 反向 import；
-  - feature 入口不得修改核心导出。
+- Core tests stay as they are; features must not require changes to core assertions.
+- Each feature has independent tests under `test/features/`.
+- Feature tests cover:
+  - data/layout derivation results;
+  - coordinates, headers, and cells after combining with the core layout;
+  - collapse/expand state toggling;
+  - render callbacks and decoration calls.
+- Run core and feature tests together on every change.
+- Optional architecture guard tests:
+  - core directories must not contain reverse imports of `features/`;
+  - feature entry points must not modify core exports.
 
-## 7. 命名与演进
+## 7. Naming and evolution
 
-- 当前使用 `features`：表达透视表产品特性，不是第三方插件机制。
-- 如果未来需要第三方注册、生命周期、动态加载，再引入独立的 `extensions/` 或 `plugins/`，不要现在预造框架。
-- feature 内部的通用工具放在 `features/internal/`，不要回流到核心。
-- 核心 API 的版本变化和 feature 的迭代解耦。
+- The name `features` expresses pivot-table product capabilities, not a third-party
+  plugin mechanism.
+- If third-party registration, lifecycles, or dynamic loading are needed later,
+  introduce a separate `extensions/` or `plugins/`; do not build the framework now.
+- Shared utilities inside features go under `features/internal/` and do not flow back
+  into the core.
+- Core API version changes and feature iteration stay decoupled.
 
-## 8. 非目标
+## 8. Non-goals
 
-当前仍不包含：
+Still excluded:
 
-- 真正的跨层单格合并；
-- 修改核心矩阵 / 几何算法或默认渲染行为；
-- 引入插件注册器、事件总线或新的运行时依赖。
+- true cross-level single-cell merging;
+- modifying core matrix / geometry algorithms or default rendering behavior;
+- introducing a plugin registry, event bus, or new runtime dependencies.
 
-小计 / 总计、折叠 / 展开已在后续迭代落地，见 3.4 / 3.7。
+Subtotals / grand totals and expand / collapse have landed in later iterations; see
+3.4 / 3.7.
 
-## 9. 未来落地顺序
+## 9. Future landing order
 
-1. 小计 / 总计、折叠 / 展开基础版已实现，并在 `site/` 接入控件与状态。
-2. 扩展折叠：cartesian。
-3. 真正的跨层单格合并。
-4. 继续补充文档、示例入口和架构守卫测试。
+1. Basic subtotals / grand totals and expand / collapse are implemented, with controls
+   and state wired into `site/`.
+2. Extend collapse: cartesian mode.
+3. True cross-level single-cell merging.
+4. Continue filling in documentation, example entry points, and architecture guard
+   tests.
 
-## 10. 评审清单
+## 10. Review checklist
 
-- [ ] 核心目录没有 diff。
-- [ ] `src/model`、`src/render` 没有 import `features`。
-- [ ] 不传 feature 参数时，核心默认行为与现在一致。
-- [ ] feature 通过组合核心输出实现，不复制核心矩阵算法。
-- [ ] feature 不原地修改核心的 `cells`、`axes`、`cellMap`。
-- [ ] 核心测试与 feature 测试同时通过。
-- [ ] 站点层只做 UI 绑定，不承载业务算法。
+- [ ] No diff in core directories.
+- [ ] `src/model` and `src/render` do not import `features`.
+- [ ] Without feature arguments, core default behavior matches the present behavior.
+- [ ] Features are implemented by composing core output, not by copying core matrix
+      algorithms.
+- [ ] Features do not mutate core `cells`, `axes`, or `cellMap` in place.
+- [ ] Core tests and feature tests pass together.
+- [ ] The site layer only handles UI binding and owns no business algorithms.
