@@ -65,15 +65,17 @@ test('英文主页除语言切换外不含中文', () => {
   );
 });
 
-test('README 双语入口与英文站点链接', () => {
-  const zhReadme = readFileSync(`${root}README.md`, 'utf8');
-  const enReadme = readFileSync(`${root}README.en.md`, 'utf8');
+test('README 默认英文、中文版与站点互链', () => {
+  const enReadme = readFileSync(`${root}README.md`, 'utf8');
+  const zhReadme = readFileSync(`${root}README.zh-CN.md`, 'utf8');
 
-  assert.match(zhReadme, /\[English\]\(README\.en\.md\)/);
-  assert.match(enReadme, /\[简体中文\]\(README\.md\)/);
+  assert.match(enReadme, /\[English\]\(README\.md\)/);
+  assert.match(enReadme, /\[简体中文\]\(README\.zh-CN\.md\)/);
+  assert.match(zhReadme, /\[English\]\(README\.md\)/);
+  assert.match(zhReadme, /\[简体中文\]\(README\.zh-CN\.md\)/);
   assert.match(zhReadme, /index\.en\.html/);
   assert.match(enReadme, /index\.en\.html/);
-  assert.match(enReadme, /README\.en\.md/);
+  assert.match(enReadme, /README\.zh-CN\.md/);
 });
 
 test('基准结果包含等长的双语说明', () => {

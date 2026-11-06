@@ -1,22 +1,22 @@
 # pivot-table
 
-[简体中文](README.md) · [English](README.en.md)
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-**在线主页：<https://vtejuf.github.io/pivot-table/>**　|　**English site: <https://vtejuf.github.io/pivot-table/index.en.html>**
+**Live site: <https://vtejuf.github.io/pivot-table/index.en.html>**　|　**中文主页: <https://vtejuf.github.io/pivot-table/>**
 
-把一组 JSON 明细聚合成透视表：聚合层保证每个维度组合唯一，矩阵变换把维度序号映射成二维整数坐标，Canvas 只绘制视口内的单元格。零运行时依赖，纯 ES Modules。
+Aggregate JSON detail rows into a pivot table: the aggregation layer keeps one row per dimension combination, a matrix transform maps member indices to 2D integer coordinates, and Canvas draws only the cells inside the viewport. Zero runtime dependencies, pure ES Modules.
 
-> **详细内容在主页**：算法推导、数据流、可交互 Demo、渲染性能、基准测试和维度深度实验都在[在线主页](https://vtejuf.github.io/pivot-table/)上。README 只保留概览和上手入口。
+> **Deep dives live on the site**: the matrix derivation, data flow, interactive demo, rendering performance, benchmarks, and depth sweep are all on the [live site](https://vtejuf.github.io/pivot-table/index.en.html). This README stays focused on the overview and getting started.
 
-## 特性
+## Highlights
 
-- **两段式模型**：`aggregate` 负责分组与度量，`layoutPivot` 负责行列与矩阵；渲染层只消费布局结果。
-- **矩阵布局**：维度层级编码成混合进制向量，一次仿射变换得到 `[x, y]`；支持 cartesian / compact 两种模式。
-- **视口虚拟化**：只遍历并绘制可见单元格，表头冻结，网格线批量描边。
-- **按需扩展**：热力图、并列度量、行/列小计与总计、展开/折叠、滚动条、自定义叠加都通过 `cellStyle`、overlay 等挂载点接入。
-- **零依赖**：Node 与浏览器共用同一套 ES Modules，没有构建步骤。
+- **Two-stage model**: `aggregate` handles grouping and measures; `layoutPivot` handles axes and the matrix. The renderer consumes only the layout result.
+- **Matrix layout**: dimension hierarchies become mixed-radix vectors, and one affine transform yields `[x, y]`; supports both cartesian and compact modes.
+- **Viewport virtualization**: iterate and draw only visible cells, keep headers frozen, and stroke grid lines in one batch.
+- **Extensible by design**: heatmaps, dual measures, row/column subtotals and grand totals, expand/collapse, scrollbars, and custom overlays all attach through `cellStyle`, overlays, and other mount points.
+- **Zero dependencies**: Node and the browser share the same ES Modules, with no build step.
 
-## 快速开始
+## Quick start
 
 ### Node
 
@@ -26,7 +26,7 @@ node --test test/model/*.test.mjs test/render/*.test.mjs \
   test/features/*.test.mjs test/site/*.test.mjs test/architecture.test.mjs
 ```
 
-### 最小调用
+### Minimal call
 
 ```js
 import { aggregate, layoutPivot } from './src/model/index.mjs';
@@ -51,85 +51,85 @@ renderPivot(canvas, layout, {
 });
 ```
 
-`dimensions` 的完整规则、聚合函数、布局模式、渲染选项和 feature 写法，见主页的[数据流](https://vtejuf.github.io/pivot-table/#pipeline)与[快速开始](https://vtejuf.github.io/pivot-table/#quickstart)。
+For the full `dimensions` rules, aggregate functions, layout modes, render options, and feature authoring, see [Data flow](https://vtejuf.github.io/pivot-table/index.en.html#pipeline) and [Quickstart](https://vtejuf.github.io/pivot-table/index.en.html#quickstart) on the live site.
 
-### 主页与示例
+### Site and examples
 
-ES module 不能走 `file://`，需要 HTTP：
+ES modules do not work over `file://`; serve the repository over HTTP:
 
 ```bash
 python3 -m http.server 8000
-# 中文主页：http://localhost:8000/
-# English: http://localhost:8000/index.en.html
-# 独立 Canvas 示例：http://localhost:8000/examples/canvas.html
+# English site: http://localhost:8000/index.en.html
+# 中文主页: http://localhost:8000/
+# Standalone Canvas example: http://localhost:8000/examples/canvas.html
 ```
 
-## 文档地图
+## Documentation map
 
-主页按顺序覆盖：
+The live site covers, in order:
 
-- [概览](https://vtejuf.github.io/pivot-table/#overview)
-- [数据流与扩展挂载点](https://vtejuf.github.io/pivot-table/#pipeline)
-- [矩阵算法](https://vtejuf.github.io/pivot-table/#algorithm)
-- [可视化 Demo](https://vtejuf.github.io/pivot-table/#demo)
-- [渲染性能](https://vtejuf.github.io/pivot-table/#performance)
-- [基准测试](https://vtejuf.github.io/pivot-table/#benchmark)
-- [维度深度实验](https://vtejuf.github.io/pivot-table/#depth)
-- [快速开始](https://vtejuf.github.io/pivot-table/#quickstart)
+- [Overview](https://vtejuf.github.io/pivot-table/index.en.html#overview)
+- [Data flow and extension mounts](https://vtejuf.github.io/pivot-table/index.en.html#pipeline)
+- [Matrix algorithm](https://vtejuf.github.io/pivot-table/index.en.html#algorithm)
+- [Live demo](https://vtejuf.github.io/pivot-table/index.en.html#demo)
+- [Rendering performance](https://vtejuf.github.io/pivot-table/index.en.html#performance)
+- [Benchmarks](https://vtejuf.github.io/pivot-table/index.en.html#benchmark)
+- [Depth sweep](https://vtejuf.github.io/pivot-table/index.en.html#depth)
+- [Quickstart](https://vtejuf.github.io/pivot-table/index.en.html#quickstart)
 
-仓库内的设计文档：
+Design docs in the repository (currently in Chinese):
 
-- [矩阵推导与 cartesian / compact 差异](docs/matrix-transform.md)
-- [Canvas 渲染管线与性能方案](docs/rendering.md)
-- [附加功能架构与边界](docs/features-architecture.md)
-- [自定义 feature 挂载点](docs/custom-features.md)
-- [行/列小计/总计规则](docs/totals.md)
+- [Matrix derivation and cartesian / compact](docs/matrix-transform.md)
+- [Canvas rendering pipeline and performance](docs/rendering.md)
+- [Feature architecture and boundaries](docs/features-architecture.md)
+- [Custom feature mount points](docs/custom-features.md)
+- [Row/column subtotal and grand-total rules](docs/totals.md)
 
-## 目录结构
+## Project layout
 
 ```
-src/model/       聚合、矩阵布局、维度键
-src/render/      几何、Canvas 绘制、主题
-src/features/    并列度量、热力图、小计/总计、折叠、滚动条等
-site/            主页脚本、Demo 控制器、示例代码
-examples/        Node 示例与独立 Canvas 页面
-test/            模型、渲染、feature、站点与架构测试
-bench/           基准与深度实验脚本、结果 JSON
-docs/            设计文档
+src/model/       Aggregation, matrix layout, dimension keys
+src/render/      Geometry, Canvas drawing, theme
+src/features/    Dual measures, heatmap, totals, collapse, scrollbars, ...
+site/            Site scripts, demo controller, code examples
+examples/        Node example and standalone Canvas page
+test/            Model, render, feature, site, and architecture tests
+bench/           Benchmark and depth-sweep scripts, result JSON
+docs/            Design documents
 ```
 
-## 开发
+## Development
 
 ```bash
-# 全量测试
+# Full test suite
 node --test test/model/*.test.mjs test/render/*.test.mjs \
   test/features/*.test.mjs test/site/*.test.mjs test/architecture.test.mjs
 
-# 基准（写入 bench/results.json）
+# Benchmarks (writes bench/results.json)
 node bench/run.mjs
 node bench/verify.mjs
 
-# 维度深度实验（写入 bench/depth-results.json）
+# Depth sweep (writes bench/depth-results.json)
 node bench/depth-run.mjs
 ```
 
-架构约束：`src/model` 与 `src/render` 不反向依赖 `src/features`；`test/architecture.test.mjs` 会守住这条边界。
+Architecture rule: `src/model` and `src/render` never import `src/features`; `test/architecture.test.mjs` enforces the boundary.
 
-## 部署
+## Deployment
 
-根目录的 `index.html` / `index.en.html` 是纯静态页面，不需要构建。GitHub Pages 从 `dev` 分支根目录发布；`main` 由维护者手动合并。`.nojekyll` 让 Pages 跳过 Jekyll，直接发布 `src/`、`site/` 等目录。
+The root `index.html` / `index.en.html` files are static and require no build. GitHub Pages publishes from the root of the `dev` branch; `main` is merged manually by the maintainer. `.nojekyll` tells Pages to skip Jekyll and publish `src/`, `site/`, and the other directories as-is.
 
-线上地址：
+Live URLs:
 
-- 中文：<https://vtejuf.github.io/pivot-table/>
 - English: <https://vtejuf.github.io/pivot-table/index.en.html>
+- 中文: <https://vtejuf.github.io/pivot-table/>
 
-## 当前假设
+## Current assumptions
 
-- 每个轴只支持一条层级链：一个根维度，每个维度最多一个子维度。
-- `dimensions` 必填，每个维度显式给出 `axis`；父子关系用 `parent` 显式给出。
-- `aggregate` 的 `dimensions` 只负责分组；`layoutPivot` 的 `dimensions` 还负责行列和层级。
-- 渲染器不自动计算列宽或换行，列宽、行高由 `cellSize` 指定。
+- Each axis supports one hierarchy chain: a single root and at most one child per dimension.
+- `dimensions` is required, and every dimension explicitly declares `axis`; parent/child relationships are declared with `parent`.
+- `aggregate` uses `dimensions` only for grouping; `layoutPivot` also uses them for axes and hierarchy.
+- The renderer does not compute column widths or wrap text; `cellSize` controls column width and row height.
 
 ## License
 
