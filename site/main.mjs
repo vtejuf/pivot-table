@@ -2,6 +2,9 @@ import { createPivotDemo } from './demo.mjs';
 import { initCodeExamples } from './code-tabs.mjs';
 import { renderBenchmark } from './bench.mjs';
 import { renderDepthExperiment } from './depth.mjs';
+import { documentLang } from './i18n.mjs';
+
+const lang = documentLang();
 
 /* -------------------------------------------------------------------------- */
 /* 侧栏导航高亮                                                               */
@@ -56,17 +59,21 @@ const compactViewport = window.matchMedia('(max-width: 720px)');
 try {
   createPivotDemo(document, {
     height: () => (compactViewport.matches ? 420 : 540),
+    lang,
   });
 } catch (error) {
   console.error(error);
   const target = document.querySelector('[data-demo-error]');
   if (target) {
     target.hidden = false;
-    target.textContent = `Demo 初始化失败：${error.message}`;
+    target.textContent =
+      lang === 'en'
+        ? `Demo failed to initialize: ${error.message}`
+        : `Demo 初始化失败：${error.message}`;
   }
 }
 
-initCodeExamples();
+initCodeExamples(document, { lang });
 
-renderBenchmark();
-renderDepthExperiment();
+renderBenchmark({ lang });
+renderDepthExperiment({ lang });

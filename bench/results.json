@@ -29,6 +29,13 @@
     "分片合并逻辑用 bench/verify.mjs 与单次聚合逐组比对，sales / __count / __valueCount 一致。",
     "布局耗时与聚合后的维度组合数相关，这里固定为 1536 个组合，因此不随原始明细数增长。"
   ],
+  "notesEn": [
+    "Each scale runs in its own Node process and repeats 3 times; the representative run is the one with the median transform time. Raw samples are kept in results.json.",
+    "Transform time = aggregate + merge + layout, excluding fixture generation. Timing uses performance.now(); memory uses process.memoryUsage() and process.resourceUsage().maxRSS.",
+    "The 10M scale uses chunked aggregation (200,000 rows per chunk) to avoid holding all detail rows at once; 10k–1M use a single aggregate() call.",
+    "Chunked merging is verified group-by-group against a single aggregate with bench/verify.mjs; sales / __count / __valueCount match.",
+    "Layout time depends on the number of aggregated dimension combinations. With 1,536 combinations fixed here, it does not grow with the input row count."
+  ],
   "results": [
     {
       "ok": true,

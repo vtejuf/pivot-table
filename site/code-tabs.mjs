@@ -5,23 +5,35 @@
  * 没有 JavaScript 时，页面保留 <noscript> 提示。
  */
 
-import { codeExamples } from './code-examples.mjs';
+import { getCodeExamples } from './code-examples.mjs';
+import { normalizeLang } from './i18n.mjs';
 
-export function initCodeExamples(root = document) {
+export function initCodeExamples(root = document, options = {}) {
   const container = root.querySelector('[data-code-examples]');
   if (!container) return null;
+
+  const lang = normalizeLang(options.lang ?? root.documentElement?.lang);
+  const examples = getCodeExamples(lang);
+  const labels = {
+    tablist: lang === 'en' ? 'Browse examples by feature' : '按功能查看示例',
+    copy: lang === 'en' ? 'Copy' : '复制',
+    copyLabel: (label) =>
+      lang === 'en' ? `Copy ${label} example` : `复制${label}示例`,
+    copied: lang === 'en' ? 'Copied' : '已复制',
+    failed: lang === 'en' ? 'Copy failed' : '复制失败',
+  };
 
   container.replaceChildren();
 
   const tablist = document.createElement('div');
   tablist.className = 'code-tabs__list';
   tablist.setAttribute('role', 'tablist');
-  tablist.setAttribute('aria-label', '按功能查看示例');
+  tablist.setAttribute('aria-label', labels.tablist);
 
   const tabs = new Map();
   const panels = new Map();
 
-  codeExamples.forEach((example, index) => {
+  examples.forEach((example, index) => {
     const tab = document.createElement('button');
     tab.type = 'button';
     tab.className = 'code-tabs__tab';
@@ -55,10 +67,10 @@ export function initCodeExamples(root = document) {
     const copy = document.createElement('button');
     copy.type = 'button';
     copy.className = 'code-card__copy';
-    copy.textContent = '复制';
-    copy.setAttribute('aria-label', `复制${example.label}示例`);
+    copy.textContent = labels.copy;
+    copy.setAttribute('aria-label', labels.copyLabel(example.label));
     copy.addEventListener('click', () => {
-      copyCode(example.code, status);
+      copyCode(example.code, status, labels);
     });
     actions.append(status, copy);
     bar.append(file, actions);
@@ -96,7 +108,7 @@ export function initCodeExamples(root = document) {
   });
 
   tablist.addEventListener('keydown', (event) => {
-    const ids = codeExamples.map((example) => example.id);
+    const ids = examples.map((example) => example.id);
     const current = ids.findIndex(
       (id) => tabs.get(id).getAttribute('aria-selected') === 'true',
     );
@@ -131,16 +143,16 @@ export function initCodeExamples(root = document) {
   };
 }
 
-async function copyCode(text, status) {
+async function copyCode(text, status, labels) {
   try {
-    await writeClipboard(text);
-    flash(status, '已复制');
+    await writeClipboard(text, labels);
+    flash(status, labels.copied);
   } catch {
-    flash(status, '复制失败');
+    flash(status, labels.failed);
   }
 }
 
-async function writeClipboard(text) {
+async function writeClipboard(text, labels) {
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(text);
@@ -149,10 +161,10 @@ async function writeClipboard(text) {
       // 权限或非安全上下文失败时退回 execCommand。
     }
   }
-  legacyCopy(text);
+  legacyCopy(text, labels);
 }
 
-function legacyCopy(text) {
+function legacyCopy(text, labels) {
   const area = document.createElement('textarea');
   area.value = text;
   area.setAttribute('readonly', '');
@@ -164,7 +176,7 @@ function legacyCopy(text) {
 
   const copied = document.execCommand('copy');
   area.remove();
-  if (!copied) throw new Error('复制失败');
+  if (!copied) throw new Error(labels.failed);
 }
 
 function flash(status, message) {

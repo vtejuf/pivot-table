@@ -65,7 +65,13 @@ import {
   rollupTotals,
   withTotals,
 } from '../src/features/totals.mjs';
-import { salesCube, countCube } from '../examples/sample-data.mjs';
+import {
+  salesCube as salesCubeZh,
+  countCube as countCubeZh,
+  salesCubeEn,
+  countCubeEn,
+} from '../examples/sample-data.mjs';
+import { localeOf, normalizeLang, pick } from './i18n.mjs';
 
 const DEFAULT_CELL_WIDTH = 104;
 const DEFAULT_HEIGHT = 560;
@@ -83,9 +89,17 @@ const cancelFrame =
 
 export function createPivotDemo(root = document, options = {}) {
   const scope = root ?? document;
+  const lang = normalizeLang(options.lang);
+  const t = (zh, en) => pick(lang, zh, en);
+  const locale = localeOf(lang);
   const canvas = scope.querySelector('[data-demo-canvas]');
   if (!canvas) {
-    throw new Error('createPivotDemo: 页面缺少 [data-demo-canvas]');
+    throw new Error(
+      t(
+        'createPivotDemo: 页面缺少 [data-demo-canvas]',
+        'createPivotDemo: page is missing [data-demo-canvas]',
+      ),
+    );
   }
 
   const stage = canvas.parentElement ?? canvas;
@@ -116,16 +130,23 @@ export function createPivotDemo(root = document, options = {}) {
       ? options.width
       : () => Math.max(320, stage.clientWidth || 0);
 
+  const salesCube = lang === 'en' ? salesCubeEn : salesCubeZh;
+  const countCube = lang === 'en' ? countCubeEn : countCubeZh;
+  const measureLabels = {
+    sales: t('销售额', 'Sales'),
+    count: t('订单数', 'Orders'),
+  };
+
   const dualCube = combineMeasures({
     dimensions: salesCube.dimensions,
     measures: [
       {
-        label: '销售额',
+        label: measureLabels.sales,
         rows: salesCube.rows,
         valueField: salesCube.measure.key,
       },
       {
-        label: '订单数',
+        label: measureLabels.count,
         rows: countCube.rows,
         valueField: countCube.measure.key,
       },
@@ -213,13 +234,13 @@ export function createPivotDemo(root = document, options = {}) {
     const measureCubes = dual
       ? [
           {
-            label: '销售额',
+            label: measureLabels.sales,
             cube: collapseActive
               ? collapseCube(salesCube, collapsed)
               : salesCube,
           },
           {
-            label: '订单数',
+            label: measureLabels.count,
             cube: collapseActive
               ? collapseCube(countCube, collapsed)
               : countCube,
@@ -387,7 +408,7 @@ export function createPivotDemo(root = document, options = {}) {
       headerSize: { row: Math.max(68, Math.round(cellWidth * 0.86)), col: 28 },
       cellStyle,
       formatValue: (value) =>
-        typeof value === 'number' ? value.toLocaleString('zh-CN') : String(value),
+        typeof value === 'number' ? value.toLocaleString(locale) : String(value),
     };
 
     const drawOverlays = (ctx, context) => {
@@ -492,27 +513,41 @@ export function createPivotDemo(root = document, options = {}) {
     if (zoomEl) zoomEl.textContent = `${cellWidth}px`;
 
     if (gridSizeEl) {
-      gridSizeEl.innerHTML =
-        `<strong>${layout.size.rows} 行 × ${layout.size.cols} 列</strong>` +
-        ` · ${layout.mode}` +
-        (totalsActive ? ' · 行/列汇总' : '') +
-        (collapseMode ? ` · 折叠 ${collapsed.size}` : '') +
-        (isDual() ? ' · 并列度量' : '');
+      const sizeText = t(
+        `<strong>${layout.size.rows} 行 × ${layout.size.cols} 列</strong>`,
+        `<strong>${layout.size.rows} rows × ${layout.size.cols} cols</strong>`,
+      );
+      const flags = [
+        layout.mode,
+        totalsActive ? t('行/列汇总', 'row/col totals') : '',
+        collapseMode
+          ? t(`折叠 ${collapsed.size}`, `collapsed ${collapsed.size}`)
+          : '',
+        isDual() ? t('并列度量', 'dual measures') : '',
+      ].filter(Boolean);
+      gridSizeEl.innerHTML = [sizeText, ...flags].join(' · ');
     }
 
     if (statsEl) {
-      statsEl.innerHTML =
+      statsEl.innerHTML = t(
         `绘制 <strong>${stats.drawnCells}</strong>/${stats.cellsInGrid} 格` +
-        ` · 表头 <strong>${stats.headerCells}</strong> 块` +
-        ` · 网格线 <strong>${stats.gridLines}</strong> 条`;
+          ` · 表头 <strong>${stats.headerCells}</strong> 块` +
+          ` · 网格线 <strong>${stats.gridLines}</strong> 条`,
+        `Drawing <strong>${stats.drawnCells}</strong>/${stats.cellsInGrid} cells` +
+          ` · <strong>${stats.headerCells}</strong> header blocks` +
+          ` · <strong>${stats.gridLines}</strong> grid lines`,
+      );
     }
 
     if (matrixEl) {
       matrixEl.textContent = totalsActive
-        ? '含汇总 · 无全局矩阵'
+        ? t('含汇总 · 无全局矩阵', 'With totals · no global matrix')
         : layout.matrix
-          ? `固定矩阵 ${layout.matrix.length}×${layout.matrix[0].length}`
-          : '分段仿射 · 无全局矩阵';
+          ? t(
+              `固定矩阵 ${layout.matrix.length}×${layout.matrix[0].length}`,
+              `Fixed matrix ${layout.matrix.length}×${layout.matrix[0].length}`,
+            )
+          : t('分段仿射 · 无全局矩阵', 'Piecewise affine · no global matrix');
     }
   }
 

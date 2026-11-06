@@ -3,9 +3,13 @@
  * 结果文件由 `node bench/run.mjs` 生成。
  */
 
+import { normalizeLang, pick } from './i18n.mjs';
+
 const RESULTS_URL = new URL('../bench/results.json', import.meta.url);
 
-export async function renderBenchmark() {
+export async function renderBenchmark(options = {}) {
+  const lang = normalizeLang(options.lang);
+  const t = (zh, en) => pick(lang, zh, en);
   const rowsEl = document.querySelector('[data-bench-rows]');
   if (!rowsEl) return;
 
@@ -17,7 +21,9 @@ export async function renderBenchmark() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
 
-    rowsEl.innerHTML = data.results.map(resultRow).join('');
+    rowsEl.innerHTML = data.results
+      .map((result) => resultRow(result, lang))
+      .join('');
 
     if (metaEl) {
       const env = data.environment;
@@ -25,14 +31,22 @@ export async function renderBenchmark() {
       const dateText = Number.isNaN(date.getTime())
         ? ''
         : date.toISOString().slice(0, 10);
+      const memory =
+        lang === 'en'
+          ? `${env.totalMemoryGB} GiB memory (${env.availableMemoryGBAtStart} GiB available)`
+          : `${env.totalMemoryGB} GiB 内存（可用 ${env.availableMemoryGBAtStart} GiB）`;
       metaEl.textContent =
         `Node ${env.node} · ${env.cpu} · ${env.cpuCount} vCPU · ` +
-        `${env.totalMemoryGB} GiB 内存（可用 ${env.availableMemoryGBAtStart} GiB）` +
+        memory +
         (dateText ? ` · ${dateText}` : '');
     }
 
     if (notesEl) {
-      notesEl.innerHTML = (data.notes ?? [])
+      const notes =
+        lang === 'en' && Array.isArray(data.notesEn)
+          ? data.notesEn
+          : (data.notes ?? []);
+      notesEl.innerHTML = notes
         .map((note) => `<li>${escapeHtml(note)}</li>`)
         .join('');
     }
@@ -41,8 +55,8 @@ export async function renderBenchmark() {
   } catch (error) {
     rowsEl.innerHTML =
       `<tr><td colspan="8" class="bench-error">` +
-      `基准结果加载失败：${escapeHtml(error.message)}` +
-      `</td></tr>`;
+      `${t('基准结果加载失败：', 'Failed to load benchmark results: ')}` +
+      `${escapeHtml(error.message)}</td></tr>`;
   }
 }
 
@@ -67,18 +81,23 @@ function setSummary(key, text) {
   if (target) target.textContent = text;
 }
 
-function resultRow(result) {
+function resultRow(result, lang) {
   if (!result.ok) {
+    const prefix = lang === 'en' ? 'Not completed: ' : '未完成：';
     return (
       `<tr><td>${formatRows(result.rows)}</td>` +
-      `<td colspan="7" class="bench-error">未完成：${escapeHtml(result.error)}</td></tr>`
+      `<td colspan="7" class="bench-error">${prefix}${escapeHtml(result.error)}</td></tr>`
     );
   }
 
   const mode =
     result.mode === 'chunked'
-      ? `分片 · ${formatRows(result.chunkSize)}/片`
-      : '单次';
+      ? lang === 'en'
+        ? `Chunked · ${formatRows(result.chunkSize)}/chunk`
+        : `分片 · ${formatRows(result.chunkSize)}/片`
+      : lang === 'en'
+        ? 'Single run'
+        : '单次';
   const modeClass = result.mode === 'chunked' ? 'chunked' : 'single';
 
   return `<tr>

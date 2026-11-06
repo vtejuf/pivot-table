@@ -186,6 +186,32 @@ pre {
   color: #93c5fd;
 }
 
+.lang-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 0 12px;
+  color: #52617a;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.lang-switch a {
+  color: var(--sidebar-muted);
+  text-decoration: none;
+}
+
+.lang-switch a:hover,
+.lang-switch a[aria-current='true'] {
+  color: #93c5fd;
+}
+
+.lang-switch a[aria-current='true'] {
+  font-weight: 600;
+}
+
 .sidebar__footer {
   display: grid;
   gap: 8px;
@@ -1686,6 +1712,12 @@ kbd {
 
   .sidebar__footer {
     display: none;
+  }
+
+  .lang-switch {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0 4px;
   }
 
   .section {

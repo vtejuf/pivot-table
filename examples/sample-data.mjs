@@ -25,22 +25,30 @@ export const dimensions = [
 ];
 
 /** 生成明细；每个城市只销售部分产品，compact 模式因此比 cartesian 更紧凑。 */
-export function createDetail() {
-  let seed = 20240607;
+export function createDetail({
+  regionCities: regions = regionCities,
+  years: yearList = years,
+  products: productList = products,
+  seed: initialSeed = 20240607,
+} = {}) {
+  let seed = initialSeed;
   const random = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 4294967296;
   };
 
   const detail = [];
-  for (const [region, cities] of Object.entries(regionCities)) {
+  for (const [region, cities] of Object.entries(regions)) {
     for (const city of cities) {
-      const offered = products.filter(() => random() > 0.28);
-      if (offered.length === 0) offered.push(products[0]);
-      for (const year of years) {
+      const offered = productList.filter(() => random() > 0.28);
+      if (offered.length === 0) offered.push(productList[0]);
+      for (const year of yearList) {
         for (const product of offered) {
           const base =
-            30 + city.length * 14 + (year - 2019) * 8 + products.indexOf(product) * 11;
+            30 +
+            city.length * 14 +
+            (year - 2019) * 8 +
+            productList.indexOf(product) * 11;
           const orders = 2 + Math.floor(random() * 3);
           for (let i = 0; i < orders; i += 1) {
             detail.push({
@@ -64,3 +72,26 @@ export const salesCube = aggregate(detail, {
   measure: { key: 'sales', aggregate: 'sum' },
 });
 export const countCube = aggregate(detail, { dimensions });
+
+/** 英文站点使用的同构示例数据；维度 key 保持不变，只替换成员取值。 */
+export const regionCitiesEn = {
+  'East China': ['Shanghai', 'Hangzhou', 'Nanjing', 'Suzhou'],
+  'North China': ['Beijing', 'Tianjin', 'Qingdao', 'Shijiazhuang'],
+  'South China': ['Guangzhou', 'Shenzhen', 'Xiamen', 'Zhuhai'],
+  'Southwest China': ['Chengdu', 'Chongqing', 'Kunming', 'Guiyang'],
+  'Central China': ['Wuhan', 'Changsha', 'Zhengzhou', 'Nanchang'],
+};
+
+export const productsEn = ['Phone', 'Laptop', 'Tablet'];
+
+export const detailEn = createDetail({
+  regionCities: regionCitiesEn,
+  products: productsEn,
+});
+
+export const salesCubeEn = aggregate(detailEn, {
+  dimensions,
+  measure: { key: 'sales', aggregate: 'sum' },
+});
+
+export const countCubeEn = aggregate(detailEn, { dimensions });

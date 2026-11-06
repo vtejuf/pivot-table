@@ -167,6 +167,13 @@ const payload = {
     '每个组合只运行一次；深度扫描用于观察趋势，不是稳定的微基准。',
     '峰值内存为 process.resourceUsage().maxRSS；原始明细在布局阶段继续驻留，内存包含完整流水线。',
   ],
+  notesEn: [
+    'Each depth combination uses its own Node process with 1M detail rows fixed; transform total = aggregate + layout, excluding data generation.',
+    'The stop condition uses matrix transform (layoutPivot) time; aggregation time is recorded separately because this measures the matrix transform itself.',
+    'The input object always has 20 dimension fields, and only rowDepth + colDepth are active at a time. Each level has 2 members, so the row grid = 2^rowDepth and the column grid = 2^colDepth.',
+    'Each combination runs once; the depth sweep shows trends and is not a stable micro-benchmark.',
+    'Peak memory is process.resourceUsage().maxRSS; detail rows stay resident during layout, so memory covers the full pipeline.',
+  ],
   stop,
   steps: results,
 };
